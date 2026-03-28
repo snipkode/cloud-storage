@@ -1,4 +1,5 @@
 import { FcGoogle } from 'react-icons/fc';
+import { useAuthStore } from '@store/authStore';
 
 function Login() {
   const { login } = useAuthStore();

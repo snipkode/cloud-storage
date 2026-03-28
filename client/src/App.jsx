@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { useAuthStore } from './store/authStore';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import { useAuthStore } from '@store/authStore';
+import Login from '@pages/Login';
+import Dashboard from '@pages/Dashboard';
 
 function App() {
   const { isAuthenticated, loading, init } = useAuthStore();
