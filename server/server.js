@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const apiRoutes = require('./routes/api');
+const apiKeyRoutes = require('./routes/api-keys');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,7 @@ app.use(express.json());
 
 // API Routes
 app.use('/api', apiRoutes);
+app.use('/api/api-keys', apiKeyRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -38,7 +40,17 @@ app.listen(PORT, () => {
 ║  🚀 Server:  http://localhost:${PORT}                      ║
 ║  📁 Uploads: ${path.join(__dirname, 'uploads')}           ║
 ║                                                           ║
-║  API Endpoints:                                           ║
+║  📡 API Endpoints:                                        ║
+║  ─────────────────────────────────────────────────────    ║
+║  🔐 API Keys:                                             ║
+║  POST   /api/api-keys          - Generate API key         ║
+║  GET    /api/api-keys          - List API keys            ║
+║  GET    /api/api-keys/:id      - Get API key info         ║
+║  POST   /api/api-keys/:id/revoke - Revoke API key         ║
+║  DELETE /api/api-keys/:id      - Delete API key           ║
+║  GET    /api/api-keys/permissions - Get permission levels ║
+║  ─────────────────────────────────────────────────────    ║
+║  📦 Storage:                                              ║
 ║  POST   /api/upload          - Upload single file         ║
 ║  POST   /api/upload-multiple - Upload multiple files      ║
 ║  GET    /api/files           - List files (tenant-scoped) ║

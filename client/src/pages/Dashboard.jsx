@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FiUpload, FiDownload, FiTrash2, FiRefreshCw, FiFile, FiX } from 'react-icons/fi';
+import { FiUpload, FiDownload, FiTrash2, FiRefreshCw, FiFile, FiX, FiKey } from 'react-icons/fi';
 import { FaGoogle } from 'react-icons/fa';
 import { useAuthStore } from '../store/authStore';
 import { useFilesStore } from '../store/filesStore';
+import ApiKeys from './ApiKeys';
 
 function Dashboard() {
   const { user, token, logout } = useAuthStore();
   const { files, loading, uploadProgress, error, fetchFiles, uploadMultiple, deleteFile, downloadFile, clearError } = useFilesStore();
   const [dragOver, setDragOver] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('files');
 
   const loadData = useCallback(async () => {
     if (token) {
@@ -89,6 +90,35 @@ function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto">
+        {/* Tabs */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setActiveTab('files')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'files'
+                ? 'bg-purple-500 text-white'
+                : 'bg-white/10 text-gray-400 hover:bg-white/20'
+            }`}
+          >
+            <FiFile className="text-sm" />
+            Files
+          </button>
+          <button
+            onClick={() => setActiveTab('api-keys')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'api-keys'
+                ? 'bg-purple-500 text-white'
+                : 'bg-white/10 text-gray-400 hover:bg-white/20'
+            }`}
+          >
+            <FiKey className="text-sm" />
+            API Keys
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'files' ? (
+          <>
         {/* Upload Area */}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -200,6 +230,10 @@ function Dashboard() {
               </span>
             </div>
           </div>
+        )}
+          </>
+        ) : (
+          <ApiKeys />
         )}
       </main>
     </div>

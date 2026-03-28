@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const authMiddleware = require('../middleware/auth');
+const { apiKeyMiddleware, requirePermission } = require('../middleware/api-key-auth');
 
 const router = express.Router();
 
@@ -42,7 +43,10 @@ const upload = multer({
 });
 
 // Upload single file
-router.post('/upload', authMiddleware, upload.single('file'), (req, res) => {
+router.post('/upload', 
+  authMiddleware, 
+  requirePermission('upload'), 
+  upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -66,7 +70,10 @@ router.post('/upload', authMiddleware, upload.single('file'), (req, res) => {
 });
 
 // Upload multiple files
-router.post('/upload-multiple', authMiddleware, upload.array('files', 10), (req, res) => {
+router.post('/upload-multiple', 
+  authMiddleware, 
+  requirePermission('upload'), 
+  upload.array('files', 10), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
@@ -90,7 +97,10 @@ router.post('/upload-multiple', authMiddleware, upload.array('files', 10), (req,
 });
 
 // List all files (tenant-scoped)
-router.get('/files', authMiddleware, (req, res) => {
+router.get('/files', 
+  authMiddleware, 
+  requirePermission('read'), 
+  (req, res) => {
   try {
     const userDir = getUserDir(req.user.uid);
     
@@ -129,7 +139,10 @@ router.get('/files', authMiddleware, (req, res) => {
 });
 
 // Download file (tenant-scoped)
-router.get('/download/:filename', authMiddleware, (req, res) => {
+router.get('/download/:filename', 
+  authMiddleware, 
+  requirePermission('read'), 
+  (req, res) => {
   try {
     const filename = req.params.filename;
     const userDir = getUserDir(req.user.uid);
@@ -146,7 +159,10 @@ router.get('/download/:filename', authMiddleware, (req, res) => {
 });
 
 // Delete file (tenant-scoped)
-router.delete('/delete/:filename', authMiddleware, (req, res) => {
+router.delete('/delete/:filename', 
+  authMiddleware, 
+  requirePermission('delete'), 
+  (req, res) => {
   try {
     const filename = req.params.filename;
     const userDir = getUserDir(req.user.uid);
@@ -164,7 +180,10 @@ router.delete('/delete/:filename', authMiddleware, (req, res) => {
 });
 
 // Get file info (tenant-scoped)
-router.get('/file/:filename', authMiddleware, (req, res) => {
+router.get('/file/:filename', 
+  authMiddleware, 
+  requirePermission('read'), 
+  (req, res) => {
   try {
     const filename = req.params.filename;
     const userDir = getUserDir(req.user.uid);
@@ -190,7 +209,10 @@ router.get('/file/:filename', authMiddleware, (req, res) => {
 });
 
 // Storage stats
-router.get('/storage-stats', authMiddleware, (req, res) => {
+router.get('/storage-stats', 
+  authMiddleware, 
+  requirePermission('read'), 
+  (req, res) => {
   try {
     const userDir = getUserDir(req.user.uid);
     
