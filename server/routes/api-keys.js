@@ -3,10 +3,10 @@ const {
   generateApiKey, 
   generateKeyId, 
   maskApiKey 
-} = require('../lib/api-key-generator');
-const apiKeyStore = require('../lib/api-key-store');
-const authMiddleware = require('../middleware/auth');
-const { apiKeyMiddleware, requirePermission } = require('../middleware/api-key-auth');
+} = require('@lib/api-key-generator');
+const apiKeyStore = require('@lib/api-key-store');
+const authMiddleware = require('@middleware/auth');
+const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-auth');
 
 const router = express.Router();
 

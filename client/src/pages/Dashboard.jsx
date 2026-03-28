@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FiUpload, FiDownload, FiTrash2, FiRefreshCw, FiFile, FiX, FiKey } from 'react-icons/fi';
 import { FaGoogle } from 'react-icons/fa';
-import { useAuthStore } from '../store/authStore';
-import { useFilesStore } from '../store/filesStore';
-import ApiKeys from './ApiKeys';
+import { useAuthStore } from '@store/authStore';
+import { useFilesStore } from '@store/filesStore';
+import ApiKeys from '@pages/ApiKeys';
 
 function Dashboard() {
   const { user, token, logout } = useAuthStore();

@@ -1,6 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const moduleAlias = require('module-alias');
+
+// Register absolute imports
+moduleAlias.addAliases({
+  '@routes': path.join(__dirname, 'routes'),
+  '@middleware': path.join(__dirname, 'middleware'),
+  '@lib': path.join(__dirname, 'lib'),
+  '@config': path.join(__dirname, 'config')
+});
+
 const apiRoutes = require('./routes/api');
 const apiKeyRoutes = require('./routes/api-keys');
 

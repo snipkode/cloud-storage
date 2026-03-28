@@ -3,7 +3,7 @@ import {
   FiKey, FiPlus, FiTrash2, FiLock, FiCopy, FiCheck, 
   FiX, FiCalendar, FiActivity, FiShield, FiCode, FiEye 
 } from 'react-icons/fi';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '@store/authStore';
 
 const PERMISSION_LEVELS = [
   { id: 'read_only', name: 'Read Only', description: 'List & download files', permissions: ['read'], color: 'blue' },

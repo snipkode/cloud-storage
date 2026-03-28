@@ -4,8 +4,14 @@
   "description": "Cloud Storage Backend with Firebase Auth",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node -r module-alias/register server.js",
+    "dev": "node -r module-alias/register server.js"
+  },
+  "_moduleAliases": {
+    "@routes": "./routes",
+    "@middleware": "./middleware",
+    "@lib": "./lib",
+    "@config": "./config"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +21,7 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "firebase-admin": "^13.7.0",
+    "module-alias": "^2.3.4",
     "multer": "^2.1.1"
   }
 }

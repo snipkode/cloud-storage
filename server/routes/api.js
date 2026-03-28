@@ -2,8 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const authMiddleware = require('../middleware/auth');
-const { apiKeyMiddleware, requirePermission } = require('../middleware/api-key-auth');
+const authMiddleware = require('@middleware/auth');
+const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-auth');
 
 const router = express.Router();
 
