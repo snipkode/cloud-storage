@@ -1,0 +1,16 @@
+{
+  "name": "cloud-storage",
+  "version": "1.0.0",
+  "description": "Multi-tenant cloud storage with React + Firebase Auth",
+  "scripts": {
+    "install:all": "cd client && npm install && cd ../server && npm install",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "start:server": "cd server && npm start",
+    "build:client": "cd client && npm run build",
+    "start": "cd server && npm start"
+  },
+  "keywords": ["cloud-storage", "firebase", "react", "multi-tenant"],
+  "author": "",
+  "license": "ISC"
+}
