@@ -95,29 +95,458 @@ atau
 ?api_key=cs_live_xxxxxxxxxxxxx
 ```
 
+> **Note:** Middleware akan mengecek API Key terlebih dahulu, lalu fallback ke Firebase JWT.
+
+---
+
 ### Storage Endpoints
 
-| Method | Endpoint | Auth | Permission | Description |
-|--------|----------|------|------------|-------------|
-| GET | `/health` | ❌ | - | Health check |
-| POST | `/api/upload` | ✅ | `upload` | Upload 1 file |
-| POST | `/api/upload-multiple` | ✅ | `upload` | Upload multiple files (max 10) |
-| GET | `/api/files` | ✅ | `read` | List semua files (user-scoped) |
-| GET | `/api/download/:filename` | ✅ | `read` | Download file |
-| GET | `/api/file/:filename` | ✅ | `read` | Get file info |
-| DELETE | `/api/delete/:filename` | ✅ | `delete` | Delete file |
-| GET | `/api/storage-stats` | ✅ | `read` | Storage usage stats |
+#### 📤 Upload File
+
+**POST** `/api/upload`
+
+Upload single file (max 50MB).
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+Content-Type: multipart/form-data
+```
+
+**Body (FormData):**
+```
+file: <file>
+```
+
+**Response (201):**
+```json
+{
+  "message": "File uploaded successfully",
+  "file": {
+    "filename": "1234567890-document.pdf",
+    "originalname": "document.pdf",
+    "size": 1024567,
+    "mimetype": "application/pdf",
+    "createdAt": "2026-03-28T10:30:00.000Z"
+  }
+}
+```
+
+**Required Permission:** `upload`
+
+---
+
+#### 📤 Upload Multiple Files
+
+**POST** `/api/upload-multiple`
+
+Upload multiple files (max 10 files, each max 50MB).
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+Content-Type: multipart/form-data
+```
+
+**Body (FormData):**
+```
+files: <file1>, <file2>, ...
+```
+
+**Response (201):**
+```json
+{
+  "message": "2 file(s) uploaded successfully",
+  "files": [
+    {
+      "filename": "1234567890-doc1.pdf",
+      "originalname": "doc1.pdf",
+      "size": 1024567,
+      "mimetype": "application/pdf",
+      "createdAt": "2026-03-28T10:30:00.000Z"
+    },
+    {
+      "filename": "1234567891-doc2.xlsx",
+      "originalname": "doc2.xlsx",
+      "size": 2048901,
+      "mimetype": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "createdAt": "2026-03-28T10:30:01.000Z"
+    }
+  ]
+}
+```
+
+**Required Permission:** `upload`
+
+---
+
+#### 📋 List Files
+
+**GET** `/api/files`
+
+List all files in user's tenant directory.
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+```
+
+**Response (200):**
+```json
+{
+  "files": [
+    {
+      "filename": "1234567890-document.pdf",
+      "originalname": "document.pdf",
+      "size": 1024567,
+      "createdAt": "2026-03-28T10:30:00.000Z",
+      "modifiedAt": "2026-03-28T10:30:00.000Z"
+    }
+  ],
+  "total": 1,
+  "stats": {
+    "totalFiles": 1,
+    "totalSize": 1024567
+  }
+}
+```
+
+**Required Permission:** `read`
+
+---
+
+#### 📥 Download File
+
+**GET** `/api/download/:filename`
+
+Download a file by filename.
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+```
+
+**Response (200):**
+```
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="document.pdf"
+<file binary data>
+```
+
+**Required Permission:** `read`
+
+**Error (404):**
+```json
+{
+  "error": "File not found"
+}
+```
+
+---
+
+#### 📄 Get File Info
+
+**GET** `/api/file/:filename`
+
+Get metadata/information about a file.
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+```
+
+**Response (200):**
+```json
+{
+  "file": {
+    "filename": "1234567890-document.pdf",
+    "originalname": "document.pdf",
+    "size": 1024567,
+    "createdAt": "2026-03-28T10:30:00.000Z",
+    "modifiedAt": "2026-03-28T10:30:00.000Z"
+  }
+}
+```
+
+**Required Permission:** `read`
+
+---
+
+#### 🗑️ Delete File
+
+**DELETE** `/api/delete/:filename`
+
+Delete a file by filename.
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+```
+
+**Response (200):**
+```json
+{
+  "message": "File deleted successfully"
+}
+```
+
+**Required Permission:** `delete`
+
+---
+
+#### 📊 Storage Stats
+
+**GET** `/api/storage-stats`
+
+Get storage usage statistics for current user.
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+```
+
+**Response (200):**
+```json
+{
+  "totalFiles": 5,
+  "totalSize": 10485760,
+  "quota": 5368709120,
+  "usagePercent": "0.20"
+}
+```
+
+**Fields:**
+- `totalFiles`: Number of files stored
+- `totalSize`: Total size in bytes
+- `quota`: Storage quota in bytes (5GB default)
+- `usagePercent`: Percentage of quota used
+
+**Required Permission:** `read`
+
+---
 
 ### API Key Management Endpoints
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/api/api-keys` | Firebase | Generate API key baru |
-| GET | `/api/api-keys` | Firebase | List semua API key |
-| GET | `/api/api-keys/:id` | Firebase | Get detail API key |
-| POST | `/api/api-keys/:id/revoke` | Firebase | Revoke API key |
-| DELETE | `/api/api-keys/:id` | Firebase | Delete API key |
-| GET | `/api/api-keys/permissions` | ❌ | Get available permission levels |
+> All API Key management endpoints require **Firebase JWT authentication** (not API Key).
+
+#### 🔑 Generate API Key
+
+**POST** `/api/api-keys`
+
+Generate a new API key.
+
+**Headers:**
+```
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "name": "Production App",
+  "permissions": ["read", "upload", "delete"],
+  "expiresAt": "2026-12-31T23:59:59.000Z"
+}
+```
+
+**Fields:**
+- `name` (required): Human-readable name for the API key
+- `permissions` (optional): Array of permissions (`read`, `upload`, `delete`, `admin`)
+- `expiresAt` (optional): Expiration date in ISO 8601 format
+
+**Response (201):**
+```json
+{
+  "message": "API key created successfully",
+  "apiKey": {
+    "id": "ak_1234567890abcdef",
+    "key": "cs_live_a1b2c3d4e5f6...",
+    "maskedKey": "cs_live_a1b2...****",
+    "name": "Production App",
+    "permissions": ["read", "upload", "delete"],
+    "expiresAt": "2026-12-31T23:59:59.000Z",
+    "createdAt": "2026-03-28T10:30:00.000Z",
+    "warning": "Store this API key securely. It will not be shown again!"
+  }
+}
+```
+
+> ⚠️ **Important:** The full API key is shown only once at creation time. Store it securely!
+
+---
+
+#### 📋 List API Keys
+
+**GET** `/api/api-keys`
+
+List all API keys for the current user.
+
+**Headers:**
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+**Response (200):**
+```json
+{
+  "apiKeys": [
+    {
+      "id": "ak_1234567890abcdef",
+      "name": "Production App",
+      "permissions": ["read", "upload", "delete"],
+      "expiresAt": "2026-12-31T23:59:59.000Z",
+      "createdAt": "2026-03-28T10:30:00.000Z",
+      "lastUsedAt": "2026-03-28T12:00:00.000Z",
+      "usageCount": 42,
+      "active": true,
+      "maskedKey": "cs_live_a1b2...****"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+#### 📄 Get API Key Info
+
+**GET** `/api/api-keys/:id`
+
+Get detailed information about a specific API key.
+
+**Headers:**
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+**Response (200):**
+```json
+{
+  "apiKey": {
+    "id": "ak_1234567890abcdef",
+    "name": "Production App",
+    "permissions": ["read", "upload", "delete"],
+    "expiresAt": "2026-12-31T23:59:59.000Z",
+    "createdAt": "2026-03-28T10:30:00.000Z",
+    "lastUsedAt": "2026-03-28T12:00:00.000Z",
+    "usageCount": 42,
+    "active": true,
+    "maskedKey": "cs_live_a1b2...****"
+  }
+}
+```
+
+---
+
+#### 📊 Get API Key Usage
+
+**GET** `/api/api-keys/:id/usage`
+
+Get usage statistics for a specific API key.
+
+**Headers:**
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+**Response (200):**
+```json
+{
+  "usage": {
+    "id": "ak_1234567890abcdef",
+    "name": "Production App",
+    "usageCount": 42,
+    "lastUsedAt": "2026-03-28T12:00:00.000Z",
+    "createdAt": "2026-03-28T10:30:00.000Z",
+    "active": true
+  }
+}
+```
+
+---
+
+#### 🚫 Revoke API Key
+
+**POST** `/api/api-keys/:id/revoke`
+
+Revoke (deactivate) an API key without deleting it.
+
+**Headers:**
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+**Response (200):**
+```json
+{
+  "message": "API key revoked successfully",
+  "apiKey": {
+    "id": "ak_1234567890abcdef",
+    "active": false
+  }
+}
+```
+
+---
+
+#### 🗑️ Delete API Key
+
+**DELETE** `/api/api-keys/:id`
+
+Permanently delete an API key.
+
+**Headers:**
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+**Response (200):**
+```json
+{
+  "message": "API key deleted successfully"
+}
+```
+
+---
+
+#### 📖 Get Permission Levels
+
+**GET** `/api/api-keys/permissions`
+
+Get available permission levels (no authentication required).
+
+**Response (200):**
+```json
+{
+  "permissions": [
+    {
+      "id": "read_only",
+      "name": "Read Only",
+      "description": "Can only list and download files",
+      "permissions": ["read"]
+    },
+    {
+      "id": "upload_only",
+      "name": "Upload Only",
+      "description": "Can only upload files",
+      "permissions": ["upload"]
+    },
+    {
+      "id": "read_write",
+      "name": "Read & Write",
+      "description": "Can read, upload, and delete files",
+      "permissions": ["read", "upload", "delete"]
+    },
+    {
+      "id": "admin",
+      "name": "Admin",
+      "description": "Full access to all operations",
+      "permissions": ["admin"]
+    }
+  ]
+}
+```
 
 ## 🏗️ Project Structure
 

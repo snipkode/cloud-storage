@@ -4,6 +4,22 @@ const path = require('path');
 const fs = require('fs');
 const authMiddleware = require('@middleware/auth');
 const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-auth');
+const fileMetadataStore = require('@lib/file-metadata-store');
+
+// Combined auth middleware - supports both Firebase JWT and API Key
+const combinedAuth = (req, res, next) => {
+  // Try API Key auth first
+  const authHeader = req.headers.authorization;
+  const apiKeyHeader = req.headers['x-api-key'];
+  const apiKeyQuery = req.query.api_key;
+
+  if (apiKeyHeader || apiKeyQuery || (authHeader && authHeader.includes('cs_'))) {
+    return apiKeyMiddleware(req, res, next);
+  }
+
+  // Fall back to Firebase auth
+  return authMiddleware(req, res, next);
+};
 
 const router = express.Router();
 
@@ -43,106 +59,121 @@ const upload = multer({
 });
 
 // Upload single file
-router.post('/upload', 
-  authMiddleware, 
-  requirePermission('upload'), 
-  upload.single('file'), (req, res) => {
+router.post('/upload',
+  combinedAuth,
+  requirePermission('upload'),
+  upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const fileInfo = {
+    // Save metadata to Firestore
+    const fileMetadata = await fileMetadataStore.createFile({
       filename: req.file.filename,
       originalname: req.file.originalname,
-      size: req.file.size,
       mimetype: req.file.mimetype,
-      createdAt: new Date().toISOString()
-    };
+      size: req.file.size,
+      userId: req.user.uid,
+      path: req.file.path
+    });
 
     res.status(201).json({
       message: 'File uploaded successfully',
-      file: fileInfo
+      file: {
+        id: fileMetadata.id,
+        filename: fileMetadata.filename,
+        originalname: fileMetadata.originalname,
+        size: fileMetadata.size,
+        mimetype: fileMetadata.mimetype,
+        createdAt: fileMetadata.createdAt
+      }
     });
   } catch (error) {
+    console.error('Upload error:', error);
     res.status(500).json({ error: 'Upload failed', details: error.message });
   }
 });
 
 // Upload multiple files
-router.post('/upload-multiple', 
-  authMiddleware, 
-  requirePermission('upload'), 
-  upload.array('files', 10), (req, res) => {
+router.post('/upload-multiple',
+  combinedAuth,
+  requirePermission('upload'),
+  upload.array('files', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    const files = req.files.map(file => ({
-      filename: file.filename,
-      originalname: file.originalname,
-      size: file.size,
-      mimetype: file.mimetype,
-      createdAt: new Date().toISOString()
-    }));
+    // Save all metadata to Firestore
+    const uploadedFiles = [];
+    for (const file of req.files) {
+      const fileMetadata = await fileMetadataStore.createFile({
+        filename: file.filename,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        userId: req.user.uid,
+        path: file.path
+      });
+      uploadedFiles.push({
+        id: fileMetadata.id,
+        filename: fileMetadata.filename,
+        originalname: fileMetadata.originalname,
+        size: fileMetadata.size,
+        mimetype: fileMetadata.mimetype,
+        createdAt: fileMetadata.createdAt
+      });
+    }
 
     res.status(201).json({
-      message: `${files.length} file(s) uploaded successfully`,
-      files: files
+      message: `${uploadedFiles.length} file(s) uploaded successfully`,
+      files: uploadedFiles
     });
   } catch (error) {
+    console.error('Upload multiple error:', error);
     res.status(500).json({ error: 'Upload failed', details: error.message });
   }
 });
 
 // List all files (tenant-scoped)
-router.get('/files', 
-  authMiddleware, 
-  requirePermission('read'), 
-  (req, res) => {
+router.get('/files',
+  combinedAuth,
+  requirePermission('read'),
+  async (req, res) => {
   try {
-    const userDir = getUserDir(req.user.uid);
-    
-    fs.readdir(userDir, (err, files) => {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to list files' });
+    const files = await fileMetadataStore.getUserFiles(req.user.uid);
+
+    const totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
+
+    res.json({
+      files: files.map(f => ({
+        id: f.id,
+        filename: f.filename,
+        originalname: f.originalname,
+        size: f.size,
+        mimetype: f.mimetype,
+        createdAt: f.createdAt,
+        updatedAt: f.updatedAt,
+        downloadCount: f.downloadCount || 0
+      })),
+      total: files.length,
+      stats: {
+        totalFiles: files.length,
+        totalSize
       }
-
-      const fileList = files.map(filename => {
-        const filePath = path.join(userDir, filename);
-        const stats = fs.statSync(filePath);
-        
-        return {
-          filename: filename,
-          originalname: filename.split('-').slice(1).join('-') || filename,
-          size: stats.size,
-          createdAt: stats.birthtime.toISOString(),
-          modifiedAt: stats.mtime.toISOString()
-        };
-      });
-
-      const totalSize = fileList.reduce((sum, f) => sum + f.size, 0);
-
-      res.json({ 
-        files: fileList, 
-        total: fileList.length,
-        stats: {
-          totalFiles: fileList.length,
-          totalSize: totalSize
-        }
-      });
     });
   } catch (error) {
+    console.error('List files error:', error);
     res.status(500).json({ error: 'Failed to list files', details: error.message });
   }
 });
 
 // Download file (tenant-scoped)
-router.get('/download/:filename', 
-  authMiddleware, 
-  requirePermission('read'), 
-  (req, res) => {
+router.get('/download/:filename',
+  combinedAuth,
+  requirePermission('read'),
+  async (req, res) => {
   try {
     const filename = req.params.filename;
     const userDir = getUserDir(req.user.uid);
@@ -152,17 +183,21 @@ router.get('/download/:filename',
       return res.status(404).json({ error: 'File not found' });
     }
 
+    // Update download count in Firestore
+    await fileMetadataStore.incrementDownloadCount(filename, req.user.uid);
+
     res.download(filePath);
   } catch (error) {
+    console.error('Download error:', error);
     res.status(500).json({ error: 'Download failed', details: error.message });
   }
 });
 
 // Delete file (tenant-scoped)
-router.delete('/delete/:filename', 
-  authMiddleware, 
-  requirePermission('delete'), 
-  (req, res) => {
+router.delete('/delete/:filename',
+  combinedAuth,
+  requirePermission('delete'),
+  async (req, res) => {
   try {
     const filename = req.params.filename;
     const userDir = getUserDir(req.user.uid);
@@ -172,70 +207,72 @@ router.delete('/delete/:filename',
       return res.status(404).json({ error: 'File not found' });
     }
 
+    // Delete physical file
     fs.unlinkSync(filePath);
+
+    // Delete metadata from Firestore
+    await fileMetadataStore.deleteFile(filename, req.user.uid);
+
     res.json({ message: 'File deleted successfully' });
   } catch (error) {
+    console.error('Delete error:', error);
     res.status(500).json({ error: 'Delete failed', details: error.message });
   }
 });
 
 // Get file info (tenant-scoped)
-router.get('/file/:filename', 
-  authMiddleware, 
-  requirePermission('read'), 
-  (req, res) => {
+router.get('/file/:filename',
+  combinedAuth,
+  requirePermission('read'),
+  async (req, res) => {
   try {
     const filename = req.params.filename;
-    const userDir = getUserDir(req.user.uid);
-    const filePath = path.join(userDir, filename);
+    
+    // Get metadata from Firestore
+    const fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid);
 
-    if (!fs.existsSync(filePath)) {
+    if (!fileMetadata) {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    const stats = fs.statSync(filePath);
-    const fileInfo = {
-      filename: filename,
-      originalname: filename.split('-').slice(1).join('-') || filename,
-      size: stats.size,
-      createdAt: stats.birthtime.toISOString(),
-      modifiedAt: stats.mtime.toISOString()
-    };
+    // Verify physical file exists
+    const userDir = getUserDir(req.user.uid);
+    const filePath = path.join(userDir, filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on disk' });
+    }
 
-    res.json({ file: fileInfo });
+    const stats = fs.statSync(filePath);
+    
+    res.json({ 
+      file: {
+        id: fileMetadata.id,
+        filename: fileMetadata.filename,
+        originalname: fileMetadata.originalname,
+        size: stats.size,
+        mimetype: fileMetadata.mimetype,
+        createdAt: fileMetadata.createdAt,
+        updatedAt: fileMetadata.updatedAt,
+        downloadCount: fileMetadata.downloadCount || 0
+      } 
+    });
   } catch (error) {
+    console.error('Get file info error:', error);
     res.status(500).json({ error: 'Failed to get file info', details: error.message });
   }
 });
 
 // Storage stats
-router.get('/storage-stats', 
-  authMiddleware, 
-  requirePermission('read'), 
-  (req, res) => {
+router.get('/storage-stats',
+  combinedAuth,
+  requirePermission('read'),
+  async (req, res) => {
   try {
-    const userDir = getUserDir(req.user.uid);
-    
-    fs.readdir(userDir, (err, files) => {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to get stats' });
-      }
-
-      let totalSize = 0;
-      files.forEach(filename => {
-        const filePath = path.join(userDir, filename);
-        const stats = fs.statSync(filePath);
-        totalSize += stats.size;
-      });
-
-      res.json({
-        totalFiles: files.length,
-        totalSize: totalSize,
-        quota: 5 * 1024 * 1024 * 1024, // 5GB quota
-        usagePercent: ((totalSize / (5 * 1024 * 1024 * 1024)) * 100).toFixed(2)
-      });
-    });
+    const stats = await fileMetadataStore.getStorageStats(req.user.uid);
+    res.json(stats);
   } catch (error) {
+    console.error('Storage stats error:', error);
     res.status(500).json({ error: 'Failed to get stats', details: error.message });
   }
 });

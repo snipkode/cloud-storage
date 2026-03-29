@@ -22,13 +22,13 @@ const PERMISSION_LEVELS = {
  * Generate new API key
  * POST /api/api-keys
  */
-router.post('/', authMiddleware, (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name, permissions, expiresAt } = req.body;
 
     // Validate name
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid name',
         message: 'API key name is required'
       });
@@ -45,7 +45,7 @@ router.post('/', authMiddleware, (req, res) => {
     const validPermissions = ['read', 'upload', 'delete', 'admin'];
     const hasInvalidPermission = selectedPermissions.some(p => !validPermissions.includes(p));
     if (hasInvalidPermission) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid permissions',
         message: `Valid permissions: ${validPermissions.join(', ')}`
       });
@@ -56,7 +56,7 @@ router.post('/', authMiddleware, (req, res) => {
     const keyId = generateKeyId();
 
     // Store API key
-    const storedKey = apiKeyStore.createApiKey({
+    const storedKey = await apiKeyStore.createApiKey({
       id: keyId,
       key: apiKey,
       userId: req.user.uid,
@@ -81,9 +81,9 @@ router.post('/', authMiddleware, (req, res) => {
     });
   } catch (error) {
     console.error('Create API key error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to create API key',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -92,148 +92,19 @@ router.post('/', authMiddleware, (req, res) => {
  * List all API keys for current user
  * GET /api/api-keys
  */
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const apiKeys = apiKeyStore.getUserApiKeys(req.user.uid);
-    
+    const apiKeys = await apiKeyStore.getUserApiKeys(req.user.uid);
+
     res.json({
       apiKeys,
       total: apiKeys.length
     });
   } catch (error) {
     console.error('List API keys error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to list API keys',
-      message: error.message 
-    });
-  }
-});
-
-/**
- * Get single API key info
- * GET /api/api-keys/:id
- */
-router.get('/:id', authMiddleware, (req, res) => {
-  try {
-    const apiKey = apiKeyStore.getApiKeyById(req.params.id);
-    
-    if (!apiKey || apiKey.userId !== req.user.uid) {
-      return res.status(404).json({ 
-        error: 'Not found',
-        message: 'API key not found'
-      });
-    }
-
-    res.json({
-      apiKey: {
-        id: apiKey.id,
-        name: apiKey.name,
-        permissions: apiKey.permissions,
-        expiresAt: apiKey.expiresAt,
-        createdAt: apiKey.createdAt,
-        lastUsedAt: apiKey.lastUsedAt,
-        usageCount: apiKey.usageCount,
-        active: apiKey.active,
-        maskedKey: maskApiKey(apiKey.keyHash) // Just for display
-      }
-    });
-  } catch (error) {
-    console.error('Get API key error:', error);
-    res.status(500).json({ 
-      error: 'Failed to get API key',
-      message: error.message 
-    });
-  }
-});
-
-/**
- * Get API key usage stats
- * GET /api/api-keys/:id/usage
- */
-router.get('/:id/usage', authMiddleware, (req, res) => {
-  try {
-    const apiKey = apiKeyStore.getApiKeyById(req.params.id);
-    
-    if (!apiKey || apiKey.userId !== req.user.uid) {
-      return res.status(404).json({ 
-        error: 'Not found',
-        message: 'API key not found'
-      });
-    }
-
-    res.json({
-      usage: {
-        id: apiKey.id,
-        name: apiKey.name,
-        usageCount: apiKey.usageCount,
-        lastUsedAt: apiKey.lastUsedAt,
-        createdAt: apiKey.createdAt,
-        active: apiKey.active
-      }
-    });
-  } catch (error) {
-    console.error('Get usage error:', error);
-    res.status(500).json({ 
-      error: 'Failed to get usage stats',
-      message: error.message 
-    });
-  }
-});
-
-/**
- * Revoke API key
- * POST /api/api-keys/:id/revoke
- */
-router.post('/:id/revoke', authMiddleware, (req, res) => {
-  try {
-    const success = apiKeyStore.revokeApiKey(req.params.id, req.user.uid);
-    
-    if (!success) {
-      return res.status(404).json({ 
-        error: 'Not found',
-        message: 'API key not found'
-      });
-    }
-
-    res.json({
-      message: 'API key revoked successfully',
-      apiKey: {
-        id: req.params.id,
-        active: false
-      }
-    });
-  } catch (error) {
-    console.error('Revoke API key error:', error);
-    res.status(500).json({ 
-      error: 'Failed to revoke API key',
-      message: error.message 
-    });
-  }
-});
-
-/**
- * Delete API key permanently
- * DELETE /api/api-keys/:id
- */
-router.delete('/:id', authMiddleware, (req, res) => {
-  try {
-    const success = apiKeyStore.deleteApiKey(req.params.id, req.user.uid);
-    
-    if (!success) {
-      return res.status(404).json({ 
-        error: 'Not found',
-        message: 'API key not found'
-      });
-    }
-
-    res.json({
-      message: 'API key deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete API key error:', error);
-    res.status(500).json({ 
-      error: 'Failed to delete API key',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -271,6 +142,135 @@ router.get('/permissions', (req, res) => {
       }
     ]
   });
+});
+
+/**
+ * Get single API key info
+ * GET /api/api-keys/:id
+ */
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const apiKey = await apiKeyStore.getApiKeyById(req.params.id);
+
+    if (!apiKey || apiKey.userId !== req.user.uid) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'API key not found'
+      });
+    }
+
+    res.json({
+      apiKey: {
+        id: apiKey.id,
+        name: apiKey.name,
+        permissions: apiKey.permissions,
+        expiresAt: apiKey.expiresAt,
+        createdAt: apiKey.createdAt,
+        lastUsedAt: apiKey.lastUsedAt,
+        usageCount: apiKey.usageCount,
+        active: apiKey.active,
+        maskedKey: maskApiKey(apiKey.keyHash) // Just for display
+      }
+    });
+  } catch (error) {
+    console.error('Get API key error:', error);
+    res.status(500).json({
+      error: 'Failed to get API key',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Get API key usage stats
+ * GET /api/api-keys/:id/usage
+ */
+router.get('/:id/usage', authMiddleware, async (req, res) => {
+  try {
+    const apiKey = await apiKeyStore.getApiKeyById(req.params.id);
+
+    if (!apiKey || apiKey.userId !== req.user.uid) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'API key not found'
+      });
+    }
+
+    res.json({
+      usage: {
+        id: apiKey.id,
+        name: apiKey.name,
+        usageCount: apiKey.usageCount,
+        lastUsedAt: apiKey.lastUsedAt,
+        createdAt: apiKey.createdAt,
+        active: apiKey.active
+      }
+    });
+  } catch (error) {
+    console.error('Get usage error:', error);
+    res.status(500).json({ 
+      error: 'Failed to get usage stats',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Revoke API key
+ * POST /api/api-keys/:id/revoke
+ */
+router.post('/:id/revoke', authMiddleware, async (req, res) => {
+  try {
+    const success = await apiKeyStore.revokeApiKey(req.params.id, req.user.uid);
+
+    if (!success) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'API key not found'
+      });
+    }
+
+    res.json({
+      message: 'API key revoked successfully',
+      apiKey: {
+        id: req.params.id,
+        active: false
+      }
+    });
+  } catch (error) {
+    console.error('Revoke API key error:', error);
+    res.status(500).json({
+      error: 'Failed to revoke API key',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Delete API key permanently
+ * DELETE /api/api-keys/:id
+ */
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    const success = await apiKeyStore.deleteApiKey(req.params.id, req.user.uid);
+
+    if (!success) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'API key not found'
+      });
+    }
+
+    res.json({
+      message: 'API key deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete API key error:', error);
+    res.status(500).json({
+      error: 'Failed to delete API key',
+      message: error.message
+    });
+  }
 });
 
 module.exports = router;

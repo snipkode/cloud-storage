@@ -1,0 +1,34 @@
+{
+  "apiKeys": [
+    {
+      "id": "key_04a720c89a0d9276",
+      "keyHash": "a5ac7dc9f60846bbe384b9e28645314f3794b802f0b32a25e800ce88d227296e",
+      "userId": "test-user",
+      "name": "Test Key",
+      "permissions": [
+        "admin"
+      ],
+      "expiresAt": null,
+      "createdAt": "2026-03-28T13:31:50.409Z",
+      "lastUsedAt": "2026-03-28T13:35:10.653Z",
+      "usageCount": 2,
+      "active": true
+    },
+    {
+      "id": "key_1fbddf7c0e1fb918",
+      "keyHash": "296568fb7b81822116583d6319691165a18b057c6114df9ec8289b1f6339110f",
+      "userId": "Qi82fxj0G2NaiphOG3V6ce8dWe73",
+      "name": "test-key",
+      "permissions": [
+        "read",
+        "upload",
+        "delete"
+      ],
+      "expiresAt": null,
+      "createdAt": "2026-03-28T13:52:54.950Z",
+      "lastUsedAt": "2026-03-28T13:53:12.171Z",
+      "usageCount": 1,
+      "active": true
+    }
+  ]
+}

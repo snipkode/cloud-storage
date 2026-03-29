@@ -22,7 +22,7 @@ const apiKeyMiddleware = async (req, res, next) => {
       apiKey = apiKeyQuery;
     } else if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split('Bearer ')[1];
-      
+
       // Check if it's an API key (starts with cs_)
       if (token.startsWith('cs_')) {
         apiKey = token;
@@ -33,7 +33,7 @@ const apiKeyMiddleware = async (req, res, next) => {
     }
 
     if (!apiKey) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Unauthorized',
         message: 'No API key or Firebase token provided'
       });
@@ -41,7 +41,7 @@ const apiKeyMiddleware = async (req, res, next) => {
 
     // Validate API key format
     if (!isValidApiKeyFormat(apiKey)) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid API key format'
       });
@@ -49,10 +49,10 @@ const apiKeyMiddleware = async (req, res, next) => {
 
     // Hash and lookup
     const keyHash = hashApiKey(apiKey);
-    const apiKeyRecord = apiKeyStore.getApiKeyByHash(keyHash);
+    const apiKeyRecord = await apiKeyStore.getApiKeyByHash(keyHash);
 
     if (!apiKeyRecord) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid API key'
       });
@@ -60,7 +60,7 @@ const apiKeyMiddleware = async (req, res, next) => {
 
     // Check if active
     if (!apiKeyRecord.active) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Unauthorized',
         message: 'API key has been revoked'
       });
@@ -68,13 +68,13 @@ const apiKeyMiddleware = async (req, res, next) => {
 
     // Check expiration
     if (apiKeyStore.isExpired(apiKeyRecord)) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Unauthorized',
         message: 'API key has expired'
       });
     }
 
-    // Update usage stats
+    // Update usage stats (non-blocking)
     apiKeyStore.updateApiKeyUsage(keyHash);
 
     // Attach user info and permissions to request
@@ -113,19 +113,19 @@ const requirePermission = (permission) => {
     // If authenticated via API key, check permissions
     if (req.user && req.user.authMethod === 'api-key') {
       const hasPermission = apiKeyStore.hasPermission(req.user, permission);
-      
+
       if (!hasPermission) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Forbidden',
           message: `API key does not have '${permission}' permission`,
           apiKeyPermissions: req.user.permissions
         });
       }
-      
+
       return next();
     }
 
-    return res.status(401).json({ 
+    return res.status(401).json({
       error: 'Unauthorized',
       message: 'Not authenticated'
     });
@@ -159,7 +159,7 @@ const optionalAuth = async (req, res, next) => {
 
     if (apiKey && isValidApiKeyFormat(apiKey)) {
       const keyHash = hashApiKey(apiKey);
-      const apiKeyRecord = apiKeyStore.getApiKeyByHash(keyHash);
+      const apiKeyRecord = await apiKeyStore.getApiKeyByHash(keyHash);
 
       if (apiKeyRecord && apiKeyRecord.active && !apiKeyStore.isExpired(apiKeyRecord)) {
         apiKeyStore.updateApiKeyUsage(keyHash);

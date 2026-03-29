@@ -1,44 +1,12 @@
-const fs = require('fs');
-const path = require('path');
+const { db } = require('./firebase-admin');
 const { hashApiKey } = require('./api-key-generator');
 
-const DB_PATH = path.join(__dirname, '..', 'data', 'api-keys.json');
-
-// Ensure data directory exists
-const ensureDataDir = () => {
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-};
-
-// Initialize database file if not exists
-const initDb = () => {
-  ensureDataDir();
-  if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ apiKeys: [] }, null, 2));
-  }
-};
-
-// Read database
-const readDb = () => {
-  initDb();
-  const data = fs.readFileSync(DB_PATH, 'utf-8');
-  return JSON.parse(data);
-};
-
-// Write database
-const writeDb = (data) => {
-  ensureDataDir();
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
-};
+const API_KEYS_COLLECTION = 'apiKeys';
 
 /**
  * Create new API key
  */
-const createApiKey = (apiKeyData) => {
-  const db = readDb();
-  
+const createApiKey = async (apiKeyData) => {
   const newKey = {
     id: apiKeyData.id,
     keyHash: hashApiKey(apiKeyData.key),
@@ -51,91 +19,102 @@ const createApiKey = (apiKeyData) => {
     usageCount: 0,
     active: true
   };
-  
-  db.apiKeys.push(newKey);
-  writeDb(db);
-  
+
+  await db.collection(API_KEYS_COLLECTION).doc(newKey.id).set(newKey);
+
   return newKey;
 };
 
 /**
  * Get API key by hashed key
  */
-const getApiKeyByHash = (keyHash) => {
-  const db = readDb();
-  return db.apiKeys.find(key => key.keyHash === keyHash);
+const getApiKeyByHash = async (keyHash) => {
+  const snapshot = await db.collection(API_KEYS_COLLECTION)
+    .where('keyHash', '==', keyHash)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return null;
+
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() };
 };
 
 /**
  * Get API key by ID
  */
-const getApiKeyById = (id) => {
-  const db = readDb();
-  return db.apiKeys.find(key => key.id === id);
+const getApiKeyById = async (id) => {
+  const doc = await db.collection(API_KEYS_COLLECTION).doc(id).get();
+
+  if (!doc.exists) return null;
+
+  return { id: doc.id, ...doc.data() };
 };
 
 /**
  * Get all API keys for a user
  */
-const getUserApiKeys = (userId) => {
-  const db = readDb();
-  return db.apiKeys
-    .filter(key => key.userId === userId)
-    .map(key => ({
-      id: key.id,
-      name: key.name,
-      permissions: key.permissions,
-      expiresAt: key.expiresAt,
-      createdAt: key.createdAt,
-      lastUsedAt: key.lastUsedAt,
-      usageCount: key.usageCount,
-      active: key.active,
-      // Don't return keyHash for security
-    }));
+const getUserApiKeys = async (userId) => {
+  const snapshot = await db.collection(API_KEYS_COLLECTION)
+    .where('userId', '==', userId)
+    .orderBy('createdAt', 'desc')
+    .get();
+
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name,
+      permissions: data.permissions,
+      expiresAt: data.expiresAt,
+      createdAt: data.createdAt,
+      lastUsedAt: data.lastUsedAt,
+      usageCount: data.usageCount,
+      active: data.active,
+    };
+  });
 };
 
 /**
  * Update API key usage
  */
-const updateApiKeyUsage = (keyHash) => {
-  const db = readDb();
-  const keyIndex = db.apiKeys.findIndex(key => key.keyHash === keyHash);
-  
-  if (keyIndex === -1) return null;
-  
-  db.apiKeys[keyIndex].lastUsedAt = new Date().toISOString();
-  db.apiKeys[keyIndex].usageCount += 1;
-  
-  writeDb(db);
-  return db.apiKeys[keyIndex];
+const updateApiKeyUsage = async (keyHash) => {
+  const apiKey = await getApiKeyByHash(keyHash);
+  if (!apiKey) return null;
+
+  const updateData = {
+    lastUsedAt: new Date().toISOString(),
+    usageCount: apiKey.usageCount + 1
+  };
+
+  await db.collection(API_KEYS_COLLECTION).doc(apiKey.id).update(updateData);
+
+  return { ...apiKey, ...updateData };
 };
 
 /**
  * Revoke API key
  */
-const revokeApiKey = (id, userId) => {
-  const db = readDb();
-  const keyIndex = db.apiKeys.findIndex(key => key.id === id && key.userId === userId);
-  
-  if (keyIndex === -1) return false;
-  
-  db.apiKeys[keyIndex].active = false;
-  writeDb(db);
-  
+const revokeApiKey = async (id, userId) => {
+  const apiKey = await getApiKeyById(id);
+
+  if (!apiKey || apiKey.userId !== userId) return false;
+
+  await db.collection(API_KEYS_COLLECTION).doc(id).update({ active: false });
+
   return true;
 };
 
 /**
  * Delete API key
  */
-const deleteApiKey = (id, userId) => {
-  const db = readDb();
-  const initialLength = db.apiKeys.length;
-  db.apiKeys = db.apiKeys.filter(key => !(key.id === id && key.userId === userId));
-  
-  if (db.apiKeys.length === initialLength) return false;
-  
-  writeDb(db);
+const deleteApiKey = async (id, userId) => {
+  const apiKey = await getApiKeyById(id);
+
+  if (!apiKey || apiKey.userId !== userId) return false;
+
+  await db.collection(API_KEYS_COLLECTION).doc(id).delete();
+
   return true;
 };
 
