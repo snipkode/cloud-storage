@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@store/authStore';
 import Login from '@pages/Login';
 import Dashboard from '@pages/Dashboard';
+import TokenExpiredWarning from '@components/TokenExpiredWarning';
 
 function App() {
   const { isAuthenticated, loading, init } = useAuthStore();
@@ -18,7 +19,12 @@ function App() {
     );
   }
 
-  return isAuthenticated ? <Dashboard /> : <Login />;
+  return (
+    <>
+      <TokenExpiredWarning />
+      {isAuthenticated ? <Dashboard /> : <Login />}
+    </>
+  );
 }
 
 export default App;

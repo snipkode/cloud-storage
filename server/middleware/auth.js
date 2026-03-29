@@ -1,4 +1,5 @@
 const { admin } = require('../lib/firebase-admin');
+const { getUserRole } = require('./role');
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -17,12 +18,16 @@ const authMiddleware = async (req, res, next) => {
     // Verify Firebase token
     const decodedToken = await admin.auth().verifyIdToken(token);
 
+    // Get user role from Firestore
+    const role = await getUserRole(decodedToken.uid);
+
     // Attach user info to request
     req.user = {
       uid: decodedToken.uid,
       email: decodedToken.email,
       displayName: decodedToken.name,
       photoURL: decodedToken.picture,
+      role,
       authMethod: 'firebase'
     };
 

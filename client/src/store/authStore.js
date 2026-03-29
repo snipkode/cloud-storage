@@ -7,6 +7,22 @@ const useAuthStore = create((set, get) => ({
   isAuthenticated: false,
   loading: true,
   tokenRefreshInterval: null,
+  tokenExpiredWarning: false,
+
+  showTokenExpiredWarning: () => {
+    set({ tokenExpiredWarning: true });
+    // Auto logout after 30 seconds if user doesn't refresh
+    setTimeout(() => {
+      const state = get();
+      if (state.tokenExpiredWarning) {
+        get().logout();
+      }
+    }, 30000);
+  },
+
+  dismissTokenExpiredWarning: () => {
+    set({ tokenExpiredWarning: false });
+  },
 
   init: () => {
     if (isFirebaseMock) {
@@ -22,18 +38,23 @@ const useAuthStore = create((set, get) => ({
       onAuthStateChanged(auth, async (user) => {
         if (user) {
           const token = await user.getIdToken();
+          // Get user role from token claims or default to 'user'
+          const idTokenResult = await user.getIdTokenResult();
+          const role = idTokenResult.claims.role || 'user';
+
           set({
             user: {
               uid: user.uid,
               email: user.email,
               displayName: user.displayName,
-              photoURL: user.photoURL
+              photoURL: user.photoURL,
+              role
             },
             token,
             isAuthenticated: true,
             loading: false
           });
-          
+
           // Auto-refresh token every 50 minutes (token expires in 60 minutes)
           const { refreshToken } = get();
           const interval = setInterval(refreshToken, 50 * 60 * 1000);
@@ -68,7 +89,8 @@ const useAuthStore = create((set, get) => ({
           uid: 'mock-user',
           email: 'dev@example.com',
           displayName: 'Dev User',
-          photoURL: 'https://ui-avatars.com/api/?name=Dev+User&background=6366f1&color=fff'
+          photoURL: 'https://ui-avatars.com/api/?name=Dev+User&background=6366f1&color=fff',
+          role: 'super_admin' // Mock role for development
         },
         token: 'mock-token',
         isAuthenticated: true
@@ -82,12 +104,16 @@ const useAuthStore = create((set, get) => ({
       const googleProvider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, googleProvider);
       const token = await result.user.getIdToken();
+      const idTokenResult = await result.user.getIdTokenResult();
+      const role = idTokenResult.claims.role || 'user';
+
       set({
         user: {
           uid: result.user.uid,
           email: result.user.email,
           displayName: result.user.displayName,
-          photoURL: result.user.photoURL
+          photoURL: result.user.photoURL,
+          role
         },
         token,
         isAuthenticated: true
@@ -106,6 +132,9 @@ const useAuthStore = create((set, get) => ({
         token: null,
         isAuthenticated: false
       });
+      // Clear notifications
+      const { useNotificationStore } = await import('./notificationStore');
+      useNotificationStore.getState().clear();
       return { success: true };
     }
 
@@ -118,6 +147,9 @@ const useAuthStore = create((set, get) => ({
         token: null,
         isAuthenticated: false
       });
+      // Clear notifications
+      const { useNotificationStore } = await import('./notificationStore');
+      useNotificationStore.getState().clear();
       return { success: true };
     } catch (error) {
       console.error('Logout error:', error);
@@ -140,8 +172,8 @@ const useAuthStore = create((set, get) => ({
       }
     } catch (error) {
       console.error('Token refresh error:', error);
-      // If refresh fails, user should re-login
-      get().logout();
+      // If refresh fails, show warning to user
+      get().showTokenExpiredWarning();
     }
     return null;
   },
@@ -152,6 +184,10 @@ const useAuthStore = create((set, get) => ({
       console.log('⚠️ 401 Unauthorized - Attempting token refresh');
       const { refreshToken } = get();
       const newToken = await refreshToken();
+      if (!newToken) {
+        // Token refresh failed, show warning
+        get().showTokenExpiredWarning();
+      }
       return newToken !== null; // Return true if refresh succeeded
     }
     return false;

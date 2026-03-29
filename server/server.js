@@ -18,6 +18,7 @@ moduleAlias.addAliases({
 
 const apiRoutes = require('./routes/api');
 const apiKeyRoutes = require('./routes/api-keys');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -80,6 +81,7 @@ app.use(express.json({ limit: '1mb' })); // Limit request size
 // API Routes
 app.use('/api', apiRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -113,6 +115,16 @@ API Keys:
   POST   /api/api-keys/:id/revoke   - Revoke
   DELETE /api/api-keys/:id          - Delete
   GET    /api/api-keys/permissions  - Permissions
+
+Notifications:
+  GET    /api/notifications              - Get user notifications
+  GET    /api/notifications/unread-count - Get unread count
+  POST   /api/notifications/:id/read     - Mark as read
+  POST   /api/notifications/read-all     - Mark all as read
+  DELETE /api/notifications/:id          - Delete notification
+  POST   /api/notifications/broadcast    - Broadcast to all users (admin)
+  POST   /api/notifications/send         - Send to specific user (admin)
+  GET    /api/notifications/admin/all    - Get all notifications (admin)
 
 Storage:
   POST   /api/upload          - Upload single

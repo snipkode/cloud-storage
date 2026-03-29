@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import {
   FiKey, FiPlus, FiTrash2, FiLock, FiCopy, FiCheck, FiCode,
   FiX, FiActivity, FiSearch, FiXCircle, FiEye,
-  FiBook, FiShield, FiClock, FiServer, FiUnlock
+  FiBook, FiShield, FiClock, FiServer, FiUnlock, FiBell
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import ApiIntegrationPreview from '@components/ApiIntegrationPreview';
+import BroadcastNotification from '@components/BroadcastNotification';
 
 const PERMISSION_LEVELS = [
   { id: 'read_only', name: 'Read Only', description: 'List & download files only', permissions: ['read'], color: 'blue', icon: '📖' },
@@ -116,7 +117,7 @@ $response = curl_exec($ch);
 };
 
 function ApiKeys() {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const [apiKeys, setApiKeys] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -138,6 +139,10 @@ function ApiKeys() {
   const [environment, setEnvironment] = useState('live');
   const [showRevealModal, setShowRevealModal] = useState(false);
   const [revealedKey, setRevealedKey] = useState(null);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+
+  // Check if user is super_admin
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const loadApiKeys = async () => {
     setLoading(true);
@@ -367,6 +372,15 @@ function ApiKeys() {
           <FiBook className="text-indigo-400" />
           <span>API Docs</span>
         </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setShowBroadcastModal(true)}
+            className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-lg transition-all shadow-lg shadow-purple-500/25 flex-shrink-0"
+            title="Broadcast Notification"
+          >
+            <FiBell className="text-base" />
+          </button>
+        )}
         <button
           onClick={() => setShowCreateModal(true)}
           className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
@@ -1140,6 +1154,11 @@ function ApiKeys() {
       {/* API Integration Preview Modal */}
       {showIntegrationPreview && (
         <ApiIntegrationPreview onClose={() => setShowIntegrationPreview(false)} />
+      )}
+
+      {/* Broadcast Notification Modal */}
+      {showBroadcastModal && (
+        <BroadcastNotification onClose={() => setShowBroadcastModal(false)} />
       )}
     </div>
   );

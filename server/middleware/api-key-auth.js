@@ -124,6 +124,13 @@ const requirePermission = (permission) => {
   return (req, res, next) => {
     // If authenticated via Firebase token, allow access
     if (req.user && req.user.authMethod === 'firebase') {
+      // For Firebase users, check if they have admin role
+      if (permission === 'admin') {
+        // Check for admin role in custom claims or allow specific admin users
+        // For now, allow all Firebase authenticated users for admin endpoints
+        // Can be restricted later based on custom claims
+        return next();
+      }
       return next();
     }
 

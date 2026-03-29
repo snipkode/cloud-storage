@@ -1,14 +1,42 @@
-import { useState } from 'react';
-import { FiKey, FiFolder, FiBell, FiSearch, FiMenu, FiX, FiLogOut } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
+import { FiKey, FiFolder, FiBell, FiMenu, FiX, FiLogOut } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
+import { useNotificationStore } from '@store/notificationStore';
 import ApiKeys from '@pages/ApiKeys';
 import FileBrowser from '@components/FileBrowser';
+import NotificationPanel from '@components/NotificationPanel';
+
+function NotificationButton({ onClick }) {
+  const { unreadCount } = useNotificationStore();
+
+  return (
+    <button
+      onClick={onClick}
+      className="relative p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
+      aria-label="Notifications"
+    >
+      <FiBell className="text-base" />
+      {unreadCount > 0 && (
+        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900"></span>
+      )}
+    </button>
+  );
+}
 
 function Dashboard() {
   const { user, token, logout } = useAuthStore();
+  const { setToken, fetchUnreadCount } = useNotificationStore();
   const [currentPage, setCurrentPage] = useState('files');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+
+  // Initialize notification store with token
+  useEffect(() => {
+    if (token) {
+      setToken(token);
+      fetchUnreadCount();
+    }
+  }, [token]);
 
   const navItems = [
     { id: 'files', label: 'Files', icon: FiFolder },
@@ -43,30 +71,12 @@ function Dashboard() {
               </div>
             </div>
 
-            {/* Center Section - Search */}
-            <div className="flex-1 max-w-md mx-4 hidden md:block">
-              <div className="relative">
-                <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
-                <input
-                  type="text"
-                  placeholder="Search files..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                />
-              </div>
-            </div>
-
             {/* Right Section */}
             <div className="flex items-center gap-2 sm:gap-3">
               {/* Notifications */}
-              <button
-                className="relative p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
-                aria-label="Notifications"
-              >
-                <FiBell className="text-base" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900"></span>
-              </button>
+              <NotificationButton
+                onClick={() => setNotificationPanelOpen(true)}
+              />
 
               {/* User Menu */}
               <div className="flex items-center gap-2 sm:gap-3 pl-3 border-l border-white/10">
@@ -227,6 +237,12 @@ function Dashboard() {
           </div>
         </main>
       </div>
+
+      {/* Notification Panel */}
+      <NotificationPanel
+        isOpen={notificationPanelOpen}
+        onClose={() => setNotificationPanelOpen(false)}
+      />
     </div>
   );
 }
