@@ -388,37 +388,15 @@ function FileBrowser() {
             </button>
 
             {/* Search */}
-            <div className="relative w-full sm:w-48">
+            <div className="relative w-full sm:w-64">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
               <input
                 type="search"
-                placeholder="Search..."
+                placeholder="Search files..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
               />
-            </div>
-
-            {/* View toggle */}
-            <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/10 flex-shrink-0">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md transition-all ${
-                  viewMode === 'grid' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-                aria-label="Grid view"
-              >
-                <FiGrid className="text-sm" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition-all ${
-                  viewMode === 'list' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-                aria-label="List view"
-              >
-                <FiList className="text-sm" />
-              </button>
             </div>
           </div>
         </div>
@@ -465,6 +443,33 @@ function FileBrowser() {
               </button>
             );
           })}
+        </div>
+
+        {/* View Toggle - Below Filter Cards */}
+        <div className="flex items-center justify-between pt-2 border-t border-white/5">
+          <span className="text-xs text-slate-500">
+            {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
+          </span>
+          <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/10">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                viewMode === 'grid' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <FiGrid className="text-sm" />
+              <span>Grid</span>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                viewMode === 'list' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <FiList className="text-sm" />
+              <span>List</span>
+            </button>
+          </div>
         </div>
       </div>
 
