@@ -6,6 +6,7 @@ const useAuthStore = create((set, get) => ({
   token: null,
   isAuthenticated: false,
   loading: true,
+  tokenRefreshInterval: null,
 
   init: () => {
     if (isFirebaseMock) {
@@ -21,7 +22,7 @@ const useAuthStore = create((set, get) => ({
       onAuthStateChanged(auth, async (user) => {
         if (user) {
           const token = await user.getIdToken();
-          set({ 
+          set({
             user: {
               uid: user.uid,
               email: user.email,
@@ -32,12 +33,23 @@ const useAuthStore = create((set, get) => ({
             isAuthenticated: true,
             loading: false
           });
+          
+          // Auto-refresh token every 50 minutes (token expires in 60 minutes)
+          const { refreshToken } = get();
+          const interval = setInterval(refreshToken, 50 * 60 * 1000);
+          set({ tokenRefreshInterval: interval });
         } else {
-          set({ 
-            user: null, 
-            token: null, 
+          // Clear interval on logout
+          const { tokenRefreshInterval } = get();
+          if (tokenRefreshInterval) {
+            clearInterval(tokenRefreshInterval);
+          }
+          set({
+            user: null,
+            token: null,
             isAuthenticated: false,
-            loading: false 
+            loading: false,
+            tokenRefreshInterval: null
           });
         }
       });
@@ -51,7 +63,7 @@ const useAuthStore = create((set, get) => ({
     if (isFirebaseMock) {
       // Mock login for development
       console.log('🔧 Mock login - Firebase not configured');
-      set({ 
+      set({
         user: {
           uid: 'mock-user',
           email: 'dev@example.com',
@@ -70,7 +82,7 @@ const useAuthStore = create((set, get) => ({
       const googleProvider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, googleProvider);
       const token = await result.user.getIdToken();
-      set({ 
+      set({
         user: {
           uid: result.user.uid,
           email: result.user.email,
@@ -89,10 +101,10 @@ const useAuthStore = create((set, get) => ({
 
   logout: async () => {
     if (isFirebaseMock) {
-      set({ 
-        user: null, 
-        token: null, 
-        isAuthenticated: false 
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false
       });
       return { success: true };
     }
@@ -101,10 +113,10 @@ const useAuthStore = create((set, get) => ({
       const { getAuth, signOut } = await import('firebase/auth');
       const auth = getAuth(app);
       await signOut(auth);
-      set({ 
-        user: null, 
-        token: null, 
-        isAuthenticated: false 
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false
       });
       return { success: true };
     } catch (error) {
@@ -115,15 +127,34 @@ const useAuthStore = create((set, get) => ({
 
   refreshToken: async () => {
     if (isFirebaseMock) return null;
-    
-    const { getAuth } = await import('firebase/auth');
-    const auth = getAuth(app);
-    if (auth.currentUser) {
-      const token = await auth.currentUser.getIdToken(true);
-      set({ token });
-      return token;
+
+    try {
+      const { getAuth } = await import('firebase/auth');
+      const auth = getAuth(app);
+      if (auth.currentUser) {
+        // Force refresh to get a new token
+        const newToken = await auth.currentUser.getIdToken(true);
+        set({ token: newToken });
+        console.log('🔄 Token refreshed successfully');
+        return newToken;
+      }
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      // If refresh fails, user should re-login
+      get().logout();
     }
     return null;
+  },
+
+  // Check if error is 401 and try to refresh
+  handleAuthError: async (error) => {
+    if (error?.status === 401 || error?.message?.includes('Unauthorized')) {
+      console.log('⚠️ 401 Unauthorized - Attempting token refresh');
+      const { refreshToken } = get();
+      const newToken = await refreshToken();
+      return newToken !== null; // Return true if refresh succeeded
+    }
+    return false;
   }
 }));
 

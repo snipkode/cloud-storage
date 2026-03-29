@@ -6,7 +6,50 @@
 - Docker Compose (version 2.0+)
 - Firebase project with Service Account
 
-## Quick Start
+## 🧪 Environment Isolation (Sandbox & Production)
+
+This application supports **full isolation** between Sandbox (Test) and Production environments.
+
+### Storage Structure
+
+```
+server/
+├── uploads/           # Production files (cs_live_*)
+│   └── {userId}/
+│       └── files...
+└── test-uploads/      # Sandbox files (cs_test_*)
+    └── {userId}/
+        └── files...
+```
+
+### Docker Volume Configuration
+
+**Production uploads** are persisted in Docker volume:
+```yaml
+volumes:
+  - uploads_data:/app/uploads  # Production files
+```
+
+**Sandbox uploads** are stored inside container (not persisted by default):
+```
+/app/test-uploads/
+```
+
+> **⚠️ Important:** If you need to persist Sandbox files, add additional volume:
+> ```yaml
+> volumes:
+>   - uploads_data:/app/uploads
+>   - ./test-uploads:/app/test-uploads  # Persist Sandbox files
+> ```
+
+### API Key Types
+
+| API Key Prefix | Environment | Access |
+|---------------|-------------|--------|
+| `cs_test_...` | Sandbox | Sandbox files only |
+| `cs_live_...` | Production | Both Sandbox & Production (via toggle) |
+
+---
 
 ### 1. Clone and Configure
 

@@ -99,6 +99,64 @@ atau
 
 ---
 
+### 🧪 Environment Toggle (Sandbox & Production)
+
+API mendukung **isolasi penuh** antara environment **Sandbox (Test)** dan **Production (Live)**.
+
+#### Cara Kerja
+
+| API Key | Upload To | View/Delete |
+|---------|-----------|-------------|
+| `cs_test_...` | Sandbox only | Sandbox only |
+| `cs_live_...` | Sandbox atau Production (via toggle) | Sandbox atau Production (via toggle) |
+
+#### Menggunakan Environment Toggle
+
+**Via UI:**
+- Toggle button **🧪 Sandbox** / **🚀 Production** di FileBrowser UI
+
+**Via API:**
+
+1. **Upload** - Gunakan header `X-Environment`:
+```bash
+# Upload ke Sandbox
+curl -X POST http://localhost:3000/api/upload \
+  -H "Authorization: Bearer cs_live_xxx" \
+  -H "X-Environment: test" \
+  -F "file=@document.pdf"
+
+# Upload ke Production
+curl -X POST http://localhost:3000/api/upload \
+  -H "Authorization: Bearer cs_live_xxx" \
+  -H "X-Environment: live" \
+  -F "file=@document.pdf"
+```
+
+2. **Download/List/Delete** - Gunakan query parameter `?environment=`:
+```bash
+# List files di Sandbox
+curl http://localhost:3000/api/files?environment=test \
+  -H "Authorization: Bearer cs_live_xxx"
+
+# Download dari Sandbox
+curl http://localhost:3000/api/download/document.pdf?environment=test \
+  -H "Authorization: Bearer cs_live_xxx" \
+  -o downloaded.pdf
+
+# Delete di Sandbox
+curl -X DELETE http://localhost:3000/api/delete/document.pdf?environment=test \
+  -H "Authorization: Bearer cs_live_xxx"
+```
+
+> **⚠️ Penting:** 
+> - API Key dengan prefix `cs_test_` **hanya bisa** akses Sandbox environment
+> - API Key dengan prefix `cs_live_` **bisa switch** antara Sandbox dan Production
+> - File fisik disimpan di folder terpisah:
+>   - Sandbox: `server/test-uploads/{userId}/`
+>   - Production: `server/uploads/{userId}/`
+
+---
+
 ### Storage Endpoints
 
 #### 📤 Upload File
@@ -111,6 +169,7 @@ Upload single file (max 50MB).
 ```
 Authorization: Bearer <api_key_or_firebase_token>
 Content-Type: multipart/form-data
+X-Environment: test|live  # Optional, default: sesuai API key environment
 ```
 
 **Body (FormData):**
@@ -127,7 +186,8 @@ file: <file>
     "originalname": "document.pdf",
     "size": 1024567,
     "mimetype": "application/pdf",
-    "createdAt": "2026-03-28T10:30:00.000Z"
+    "createdAt": "2026-03-28T10:30:00.000Z",
+    "environment": "test"  # Environment tempat file disimpan
   }
 }
 ```
@@ -146,6 +206,7 @@ Upload multiple files (max 10 files, each max 50MB).
 ```
 Authorization: Bearer <api_key_or_firebase_token>
 Content-Type: multipart/form-data
+X-Environment: test|live  # Optional, default: sesuai API key environment
 ```
 
 **Body (FormData):**
@@ -163,14 +224,16 @@ files: <file1>, <file2>, ...
       "originalname": "doc1.pdf",
       "size": 1024567,
       "mimetype": "application/pdf",
-      "createdAt": "2026-03-28T10:30:00.000Z"
+      "createdAt": "2026-03-28T10:30:00.000Z",
+      "environment": "test"
     },
     {
       "filename": "1234567891-doc2.xlsx",
       "originalname": "doc2.xlsx",
       "size": 2048901,
       "mimetype": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "createdAt": "2026-03-28T10:30:01.000Z"
+      "createdAt": "2026-03-28T10:30:01.000Z",
+      "environment": "test"
     }
   ]
 }
@@ -191,6 +254,11 @@ List all files in user's tenant directory.
 Authorization: Bearer <api_key_or_firebase_token>
 ```
 
+**Query Parameters:**
+```
+?environment=test|live  # Optional, default: sesuai API key environment
+```
+
 **Response (200):**
 ```json
 {
@@ -206,7 +274,8 @@ Authorization: Bearer <api_key_or_firebase_token>
   "total": 1,
   "stats": {
     "totalFiles": 1,
-    "totalSize": 1024567
+    "totalSize": 1024567,
+    "environment": "test"  # Environment yang sedang dilihat
   }
 }
 ```
@@ -226,6 +295,11 @@ Download a file by filename.
 Authorization: Bearer <api_key_or_firebase_token>
 ```
 
+**Query Parameters:**
+```
+?environment=test|live  # Optional, default: sesuai API key environment
+```
+
 **Response (200):**
 ```
 Content-Type: application/octet-stream
@@ -242,6 +316,8 @@ Content-Disposition: attachment; filename="document.pdf"
 }
 ```
 
+> **💡 Tip:** Jika file tidak ditemukan di environment yang diminta, backend akan mencoba mencari di environment lain (fallback). Ini berguna untuk file yang ter-upload dengan metadata salah.
+
 ---
 
 #### 📄 Get File Info
@@ -255,6 +331,11 @@ Get metadata/information about a file.
 Authorization: Bearer <api_key_or_firebase_token>
 ```
 
+**Query Parameters:**
+```
+?environment=test|live  # Optional, default: sesuai API key environment
+```
+
 **Response (200):**
 ```json
 {
@@ -263,7 +344,8 @@ Authorization: Bearer <api_key_or_firebase_token>
     "originalname": "document.pdf",
     "size": 1024567,
     "createdAt": "2026-03-28T10:30:00.000Z",
-    "modifiedAt": "2026-03-28T10:30:00.000Z"
+    "modifiedAt": "2026-03-28T10:30:00.000Z",
+    "environment": "test"
   }
 }
 ```
@@ -281,6 +363,11 @@ Delete a file by filename.
 **Headers:**
 ```
 Authorization: Bearer <api_key_or_firebase_token>
+```
+
+**Query Parameters:**
+```
+?environment=test|live  # Optional, default: sesuai API key environment
 ```
 
 **Response (200):**
@@ -305,13 +392,19 @@ Get storage usage statistics for current user.
 Authorization: Bearer <api_key_or_firebase_token>
 ```
 
+**Query Parameters:**
+```
+?environment=test|live  # Optional, default: sesuai API key environment
+```
+
 **Response (200):**
 ```json
 {
   "totalFiles": 5,
   "totalSize": 10485760,
   "quota": 5368709120,
-  "usagePercent": "0.20"
+  "usagePercent": "0.20",
+  "environment": "test"  # Environment yang sedang dilihat
 }
 ```
 
@@ -346,7 +439,8 @@ Content-Type: application/json
 {
   "name": "Production App",
   "permissions": ["read", "upload", "delete"],
-  "expiresAt": "2026-12-31T23:59:59.000Z"
+  "expiresAt": "2026-12-31T23:59:59.000Z",
+  "environment": "live"  # "test" untuk Sandbox, "live" untuk Production
 }
 ```
 
@@ -354,6 +448,10 @@ Content-Type: application/json
 - `name` (required): Human-readable name for the API key
 - `permissions` (optional): Array of permissions (`read`, `upload`, `delete`, `admin`)
 - `expiresAt` (optional): Expiration date in ISO 8601 format
+- `environment` (optional): Environment untuk API key ini
+  - `"test"` - API key untuk Sandbox (hanya bisa akses test-uploads)
+  - `"live"` - API key untuk Production (bisa akses uploads dan test-uploads via toggle)
+  - Default: `"live"`
 
 **Response (201):**
 ```json
@@ -361,18 +459,22 @@ Content-Type: application/json
   "message": "API key created successfully",
   "apiKey": {
     "id": "ak_1234567890abcdef",
-    "key": "cs_live_a1b2c3d4e5f6...",
+    "key": "cs_live_a1b2c3d4e5f6...",  # Prefix cs_test_ untuk Sandbox, cs_live_ untuk Production
     "maskedKey": "cs_live_a1b2...****",
     "name": "Production App",
     "permissions": ["read", "upload", "delete"],
     "expiresAt": "2026-12-31T23:59:59.000Z",
+    "environment": "live",
     "createdAt": "2026-03-28T10:30:00.000Z",
     "warning": "Store this API key securely. It will not be shown again!"
   }
 }
 ```
 
-> ⚠️ **Important:** The full API key is shown only once at creation time. Store it securely!
+> ⚠️ **Important:** 
+> - The full API key is shown only once at creation time. Store it securely!
+> - API key dengan prefix `cs_test_` **hanya bisa** akses Sandbox environment
+> - API key dengan prefix `cs_live_` **bisa switch** antara Sandbox dan Production via UI toggle atau API headers
 
 ---
 

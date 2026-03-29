@@ -488,9 +488,9 @@ function ApiKeys() {
           filteredKeys.map((key) => (
             <div
               key={key.id}
-              className="card p-3 hover:border-indigo-500/30 transition-all group"
+              className="card p-2 hover:border-indigo-500/30 transition-all group"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {/* Icon */}
                 <button
                   onClick={() => {
@@ -499,20 +499,19 @@ function ApiKeys() {
                     setExampleIdx(0);
                     setShowCodeModal(true);
                   }}
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+                  className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
                     key.active
                       ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30'
                       : 'bg-slate-800/50 border border-slate-700/50'
                   }`}
                 >
-                  <FiKey className={key.active ? 'text-indigo-400 text-sm' : 'text-slate-600 text-sm'} />
+                  <FiKey className={key.active ? 'text-indigo-400 text-xs' : 'text-slate-600 text-xs'} />
                 </button>
 
                 {/* Info */}
                 <div
                   className="flex-1 min-w-0 cursor-pointer"
                   onClick={() => {
-                    // Pass the actual API key value (only available right after creation)
                     const keyValue = key.key || key.apiKey || '';
                     setSelectedKey({ ...key, key: keyValue });
                     setCodeLang('curl');
@@ -520,70 +519,71 @@ function ApiKeys() {
                     setShowCodeModal(true);
                   }}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-white font-medium text-sm truncate">{key.name}</span>
-                    <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium flex items-center gap-1 flex-shrink-0 ${
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-white font-medium text-xs truncate">{key.name}</span>
+                    <span className={`px-1.5 py-0.5 text-[9px] rounded-full font-medium flex items-center gap-1 flex-shrink-0 ${
                       key.active
                         ? 'bg-green-500/10 text-green-400 border border-green-500/30'
                         : 'bg-red-500/10 text-red-400 border border-red-500/30'
                     }`}>
                       <span className={`w-1 h-1 rounded-full ${key.active ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                      {key.active ? 'Active' : 'Revoked'}
+                      <span className="hidden xs:inline">{key.active ? 'Active' : 'Revoked'}</span>
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
-                    <span className={`font-mono px-1.5 py-0.5 rounded border flex items-center gap-1 flex-shrink-0 ${
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                    <span className={`font-mono px-1 py-0.5 rounded border flex items-center gap-1 flex-shrink-0 ${
                       key.environment === 'test'
                         ? 'bg-amber-500/5 border-amber-500/20 text-amber-400'
                         : 'bg-green-500/5 border-green-500/20 text-green-400'
                     }`}>
-                      <span>{key.environment === 'test' ? '🧪' : '🚀'}</span>
-                      {key.id?.slice(0, 8)}
+                      <span className="text-[9px]">{key.environment === 'test' ? '🧪' : '🚀'}</span>
+                      <span className="hidden xs:inline">{key.id?.slice(0, 8)}</span>
+                      <span className="xs:hidden">{key.id?.slice(0, 4)}</span>
                     </span>
                     <span className="flex items-center gap-1 flex-shrink-0">
-                      <FiActivity className="text-[10px]" />
+                      <FiActivity className="text-[9px]" />
                       {key.usageCount || 0}
                     </span>
                     {key.lastUsedAt && (
-                      <span className="truncate">{new Date(key.lastUsedAt).toLocaleDateString()}</span>
+                      <span className="truncate hidden sm:inline">{new Date(key.lastUsedAt).toLocaleDateString()}</span>
                     )}
                   </div>
                 </div>
 
                 {/* Permissions - Compact */}
-                <div className="hidden md:flex items-center gap-1 flex-shrink-0">
+                <div className="hidden lg:flex items-center gap-1 flex-shrink-0">
                   {key.permissions.slice(0, 3).map((perm) => (
                     <span
                       key={perm}
-                      className={`px-1.5 py-1 text-[10px] rounded font-medium border ${getPermissionBadgeClass(perm)}`}
+                      className={`px-1 py-0.5 text-[9px] rounded font-medium border ${getPermissionBadgeClass(perm)}`}
                       title={perm}
                     >
                       {perm.charAt(0).toUpperCase()}
                     </span>
                   ))}
                   {key.permissions.length > 3 && (
-                    <span className="text-[10px] text-slate-500">+{key.permissions.length - 3}</span>
+                    <span className="text-[9px] text-slate-500">+{key.permissions.length - 3}</span>
                   )}
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-0.5 flex-shrink-0">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleReveal(key.id);
                     }}
-                    className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
+                    className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-md transition-all"
                     title="Show API Key"
                   >
-                    <FiEye className="text-sm" />
+                    <FiEye className="text-xs" />
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleToggle(key.id);
                     }}
-                    className={`p-2 rounded-lg transition-all ${
+                    className={`p-1.5 rounded-md transition-all ${
                       key.active
                         ? 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10'
                         : 'text-slate-400 hover:text-green-400 hover:bg-green-500/10'
@@ -591,9 +591,9 @@ function ApiKeys() {
                     title={key.active ? 'Revoke' : 'Reactivate'}
                   >
                     {key.active ? (
-                      <FiLock className="text-sm" />
+                      <FiLock className="text-xs" />
                     ) : (
-                      <FiUnlock className="text-sm" />
+                      <FiUnlock className="text-xs" />
                     )}
                   </button>
                   <button
@@ -601,10 +601,10 @@ function ApiKeys() {
                       e.stopPropagation();
                       handleDelete(key.id);
                     }}
-                    className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all"
                     title="Delete"
                   >
-                    <FiTrash2 className="text-sm" />
+                    <FiTrash2 className="text-xs" />
                   </button>
                 </div>
               </div>

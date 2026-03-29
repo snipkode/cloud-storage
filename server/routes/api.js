@@ -48,7 +48,16 @@ const getUserDir = (uid, environment = 'live') => {
 // Configure multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const env = req.user?.environment || 'live';
+    // Check for environment override header (for UI toggle)
+    const headerEnv = req.headers['x-environment'];
+    const baseEnv = req.user?.environment || 'live';
+    
+    // If user has API key with test env, they can only upload to test
+    // If user has API key with live env, they can upload to either via header
+    const env = (baseEnv === 'test') 
+      ? 'test'  // Test key users are locked to test environment
+      : (headerEnv === 'test' || headerEnv === 'live' ? headerEnv : baseEnv);
+    
     const userDir = getUserDir(req.user.uid, env);
     cb(null, userDir);
   },
@@ -67,6 +76,7 @@ const upload = multer({
 });
 
 // Upload single file
+// Header X-Environment: test|live to override API key environment (live keys only)
 router.post('/upload',
   combinedAuth,
   requirePermission('upload'),
@@ -76,7 +86,24 @@ router.post('/upload',
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const env = req.user.environment || 'live';
+    // Check for environment override header (for UI toggle)
+    const headerEnv = req.headers['x-environment'];
+    const baseEnv = req.user.environment || 'live';
+    
+    console.log(`[Upload] User: ${req.user.uid}, API Key Env: ${baseEnv}, Header Env: ${headerEnv || 'none'}`);
+    
+    // If user has API key with test env, they can only upload to test
+    // If user has API key with live env, they can upload to either via header
+    let env;
+    if (baseEnv === 'test') {
+      env = 'test';  // Test key users are locked to test environment
+    } else if (headerEnv === 'test' || headerEnv === 'live') {
+      env = headerEnv;  // Live key users can switch via header
+    } else {
+      env = baseEnv;  // Default to API key environment
+    }
+    
+    console.log(`[Upload] Using environment: ${env}, File path: ${req.file.path}`);
 
     // Save metadata to Firestore
     const fileMetadata = await fileMetadataStore.createFile({
@@ -108,6 +135,7 @@ router.post('/upload',
 });
 
 // Upload multiple files
+// Header X-Environment: test|live to override API key environment (live keys only)
 router.post('/upload-multiple',
   combinedAuth,
   requirePermission('upload'),
@@ -117,11 +145,29 @@ router.post('/upload-multiple',
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    const env = req.user.environment || 'live';
+    // Check for environment override header (for UI toggle)
+    const headerEnv = req.headers['x-environment'];
+    const baseEnv = req.user.environment || 'live';
+    
+    console.log(`[Upload Multiple] User: ${req.user.uid}, API Key Env: ${baseEnv}, Header Env: ${headerEnv || 'none'}`);
+    
+    // If user has API key with test env, they can only upload to test
+    // If user has API key with live env, they can upload to either via header
+    let env;
+    if (baseEnv === 'test') {
+      env = 'test';  // Test key users are locked to test environment
+    } else if (headerEnv === 'test' || headerEnv === 'live') {
+      env = headerEnv;  // Live key users can switch via header
+    } else {
+      env = baseEnv;  // Default to API key environment
+    }
+    
+    console.log(`[Upload Multiple] Using environment: ${env}`);
 
     // Save all metadata to Firestore
     const uploadedFiles = [];
     for (const file of req.files) {
+      console.log(`[Upload Multiple] File: ${file.filename}, Path: ${file.path}`);
       const fileMetadata = await fileMetadataStore.createFile({
         filename: file.filename,
         originalname: file.originalname,
@@ -153,12 +199,30 @@ router.post('/upload-multiple',
 });
 
 // List all files (tenant-scoped)
+// Optional query param: ?environment=test|live to override API key environment
 router.get('/files',
   combinedAuth,
   requirePermission('read'),
   async (req, res) => {
   try {
-    const env = req.user.environment || 'live';
+    const queryEnv = req.query.environment;
+    const baseEnv = req.user.environment || 'live';
+    
+    console.log(`[List Files] User: ${req.user.uid}, API Key Env: ${baseEnv}, Query Env: ${queryEnv || 'none'}`);
+
+    // If user has API key with test env, they can only view test files
+    // If user has API key with live env, they can view both via query param
+    let env;
+    if (baseEnv === 'test') {
+      env = 'test';  // Test key users are locked to test environment
+    } else if (queryEnv === 'test' || queryEnv === 'live') {
+      env = queryEnv;  // Live key users can switch via query param
+    } else {
+      env = baseEnv;  // Default to API key environment
+    }
+    
+    console.log(`[List Files] Using environment: ${env}`);
+
     const files = await fileMetadataStore.getUserFiles(req.user.uid, env);
 
     const totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
@@ -188,23 +252,74 @@ router.get('/files',
 });
 
 // Download file (tenant-scoped)
+// Optional query param: ?environment=test|live to override API key environment
 router.get('/download/:filename',
   combinedAuth,
   requirePermission('read'),
   async (req, res) => {
   try {
-    const env = req.user.environment || 'live';
+    const queryEnv = req.query.environment;
+    const baseEnv = req.user.environment || 'live';
+    
+    console.log(`[Download] User: ${req.user.uid}, API Key Env: ${baseEnv}, Query Env: ${queryEnv}`);
+
+    // If user has API key with test env, they can only download from test
+    // If user has API key with live env, they can download from either via query param
+    let env;
+    if (baseEnv === 'test') {
+      env = 'test';  // Test key users are locked to test environment
+    } else if (queryEnv === 'test' || queryEnv === 'live') {
+      env = queryEnv;  // Live key users can switch via query param
+    } else {
+      env = baseEnv;  // Default to API key environment
+    }
+    
+    console.log(`[Download] Using environment: ${env}`);
+
     const userDir = getUserDir(req.user.uid, env);
     const filename = req.params.filename;
-    const filePath = path.join(userDir, filename);
+    let filePath = path.join(userDir, filename);
+    
+    console.log(`[Download] File path: ${filePath}`);
 
+    // Check if file exists BEFORE trying to download
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found' });
+      const otherEnv = env === 'test' ? 'live' : 'test';
+      const otherUserDir = getUserDir(req.user.uid, otherEnv);
+      const otherFilePath = path.join(otherUserDir, filename);
+      
+      console.log(`[Download] File not found in ${env}, trying ${otherEnv}: ${otherFilePath}`);
+      
+      if (fs.existsSync(otherFilePath)) {
+        console.log(`[Download] Found file in ${otherEnv}, using that instead`);
+        env = otherEnv;
+        filePath = otherFilePath;
+        // Check if metadata exists in the other environment
+        try {
+          const file = await fileMetadataStore.getFileByFilename(filename, req.user.uid, otherEnv);
+          if (file) {
+            console.log(`[Download] File metadata exists in ${otherEnv}, keeping as is`);
+          }
+        } catch (e) {
+          console.error('[Download] Error checking metadata:', e);
+        }
+      } else {
+        console.error(`[Download] File not found in either environment`);
+        return res.status(404).json({ 
+          error: 'File not found',
+          details: `File not found in ${env} or ${otherEnv}`
+        });
+      }
     }
 
     // Update download count in Firestore
     await fileMetadataStore.incrementDownloadCount(filename, req.user.uid, env);
 
+    // Set explicit headers for download
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(path.basename(filename))}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    
+    console.log(`[Download] Sending file: ${filename} from ${env}`);
     res.download(filePath);
   } catch (error) {
     console.error('Download error:', error);
@@ -213,12 +328,26 @@ router.get('/download/:filename',
 });
 
 // Delete file (tenant-scoped)
+// Optional query param: ?environment=test|live to override API key environment
 router.delete('/delete/:filename',
   combinedAuth,
   requirePermission('delete'),
   async (req, res) => {
   try {
-    const env = req.user.environment || 'live';
+    const queryEnv = req.query.environment;
+    const baseEnv = req.user.environment || 'live';
+
+    // If user has API key with test env, they can only delete test files
+    // If user has API key with live env, they can delete from both via query param
+    let env;
+    if (baseEnv === 'test') {
+      env = 'test';  // Test key users are locked to test environment
+    } else if (queryEnv === 'test' || queryEnv === 'live') {
+      env = queryEnv;  // Live key users can switch via query param
+    } else {
+      env = baseEnv;  // Default to API key environment
+    }
+
     const userDir = getUserDir(req.user.uid, env);
     const filename = req.params.filename;
     const filePath = path.join(userDir, filename);

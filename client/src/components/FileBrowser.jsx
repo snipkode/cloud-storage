@@ -9,6 +9,38 @@ import { useAuthStore } from '@store/authStore';
 import { useFilesStore } from '@store/filesStore';
 
 /**
+ * Environment toggle component to switch between Test/Live mode
+ */
+const EnvironmentToggle = ({ environment, onEnvironmentChange }) => {
+  return (
+    <div className="flex items-center gap-1 bg-slate-800/50 border border-white/10 rounded-lg p-0.5">
+      <button
+        onClick={() => onEnvironmentChange('test')}
+        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all min-w-[64px] justify-center ${
+          environment === 'test'
+            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+            : 'text-slate-400 hover:text-white hover:bg-white/5'
+        }`}
+      >
+        <span className="text-[10px]">🧪</span>
+        <span className="hidden xs:inline">Sandbox</span>
+      </button>
+      <button
+        onClick={() => onEnvironmentChange('live')}
+        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all min-w-[64px] justify-center ${
+          environment === 'live'
+            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+            : 'text-slate-400 hover:text-white hover:bg-white/5'
+        }`}
+      >
+        <span className="text-[10px]">🚀</span>
+        <span className="hidden xs:inline">Production</span>
+      </button>
+    </div>
+  );
+};
+
+/**
  * Get appropriate icon for file type based on mimetype or extension
  */
 const getFileIcon = (mimetype, filename) => {
@@ -59,13 +91,14 @@ const formatRelativeTime = (date) => {
 
 function FileBrowser() {
   const { token } = useAuthStore();
-  const { files, loading, uploadProgress, error, fetchFiles, uploadMultiple, deleteFile, downloadFile, clearError } = useFilesStore();
+  const { files, loading, uploadProgress, error, fetchFiles, uploadMultiple, deleteFile, downloadFile, clearError, environment } = useFilesStore();
 
   // View state
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('fileBrowserView') || 'grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [fileTypeFilter, setFileTypeFilter] = useState('all');
+  const [currentEnvironment, setCurrentEnvironment] = useState('live');
 
   // Folder navigation state
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -98,16 +131,20 @@ function FileBrowser() {
   const contextMenuRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Load files on mount
-  const loadData = useCallback(async () => {
-    if (token) {
-      await fetchFiles(token);
-    }
-  }, [token, fetchFiles]);
-
+  // Load files when environment changes
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    console.log(`[FileBrowser] Loading files for environment: ${currentEnvironment}`);
+    if (token) {
+      fetchFiles(token, currentEnvironment);
+    }
+  }, [token, currentEnvironment, fetchFiles]);
+
+  // Handle environment switch
+  const handleEnvironmentChange = useCallback((newEnv) => {
+    console.log(`[FileBrowser] Switching environment from ${currentEnvironment} to ${newEnv}`);
+    setCurrentEnvironment(newEnv);
+    // fetchFiles will be called by the useEffect above when currentEnvironment changes
+  }, [currentEnvironment]);
 
   // Load preview image when index changes
   useEffect(() => {
@@ -294,7 +331,7 @@ function FileBrowser() {
       setCurrentFolder(item);
       setSelectedFiles([]);
     } else {
-      downloadFile(item.filename, token);
+      downloadFile(item.filename, token, currentEnvironment);
     }
   };
 
@@ -320,7 +357,7 @@ function FileBrowser() {
     if (selectedFiles.length > 0) {
       setIsUploading(true);
       try {
-        await uploadMultiple(selectedFiles, token);
+        await uploadMultiple(selectedFiles, token, currentEnvironment);
       } catch (err) {
         console.error('Upload failed:', err);
       } finally {
@@ -341,7 +378,7 @@ function FileBrowser() {
       if (item.type === 'folder') {
         // TODO: Implement folder delete API
       } else {
-        await deleteFile(item.filename, token);
+        await deleteFile(item.filename, token, currentEnvironment);
       }
       setSelectedFiles([]);
       setContextMenu(null);
@@ -363,7 +400,7 @@ function FileBrowser() {
         if (item.type === 'folder') {
           // TODO: Implement folder delete API
         } else {
-          await deleteFile(item.filename, token);
+          await deleteFile(item.filename, token, currentEnvironment);
         }
       }
       setSelectedFiles([]);
@@ -376,7 +413,7 @@ function FileBrowser() {
 
   // Handle download
   const handleDownload = (item) => {
-    downloadFile(item.filename, token);
+    downloadFile(item.filename, token, currentEnvironment);
     setContextMenu(null);
   };
 
@@ -483,58 +520,63 @@ function FileBrowser() {
   return (
     <div className="h-full">
       {/* Toolbar */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {/* Top Bar: Title + Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className="min-w-0">
-              <h1 className="text-white font-semibold text-lg truncate">
+              <h1 className="text-white font-semibold text-base truncate">
                 {currentFolder ? (currentFolder.originalname || currentFolder.name) : 'All Files'}
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5 truncate">
+              <p className="text-[10px] text-slate-500 mt-0.5 truncate">
                 {currentFolder ? 'Browse folder contents' : 'Manage and organize your files'}
               </p>
             </div>
-            <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-full flex-shrink-0 hidden sm:inline">
+            <span className="text-[10px] text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded-full flex-shrink-0 hidden sm:inline">
               {folders.length + fileList.length} items
             </span>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-wrap flex-shrink-0">
+            {/* Environment Toggle - Compact */}
+            <EnvironmentToggle
+              environment={currentEnvironment}
+              onEnvironmentChange={handleEnvironmentChange}
+            />
             {/* Upload */}
             <button
               onClick={() => setUploadModalOpen(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
+              className="flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-lg shadow-indigo-500/25 min-w-[72px] justify-center"
             >
-              <FiUpload className="text-sm" />
+              <FiUpload className="text-xs" />
               <span className="hidden sm:inline">Upload</span>
             </button>
 
             {/* New Folder */}
             <button
               onClick={() => setShowNewFolderModal(true)}
-              className="flex items-center gap-2 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              className="flex items-center gap-1.5 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all min-w-[72px] justify-center"
             >
-              <FiPlus className="text-sm" />
+              <FiPlus className="text-xs" />
               <span className="hidden sm:inline">New Folder</span>
             </button>
 
-            {/* Search */}
-            <div className="relative w-full sm:w-64">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
+            {/* Search - Compact */}
+            <div className="relative w-full sm:w-48">
+              <FiSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs" />
               <input
                 type="search"
-                placeholder="Search files..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                className="w-full bg-slate-800/50 border border-white/10 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
               />
             </div>
           </div>
         </div>
 
-        {/* File Type Filter - Grid Cards */}
-        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+        {/* File Type Filter - Grid Cards - Compact */}
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
           {[
             { id: 'all', label: 'All', icon: FiFolder, color: 'from-slate-500 to-slate-600' },
             { id: 'media', label: 'Media', icon: FiImage, color: 'from-pink-500 to-rose-500' },
@@ -550,20 +592,20 @@ function FileBrowser() {
               <button
                 key={filter.id}
                 onClick={() => setFileTypeFilter(filter.id)}
-                className={`relative p-2 rounded-xl border transition-all overflow-hidden group ${
+                className={`relative p-1.5 rounded-lg border transition-all overflow-hidden group ${
                   fileTypeFilter === filter.id
                     ? 'bg-slate-800/80 border-indigo-500/50 shadow-lg shadow-indigo-500/20'
                     : 'bg-slate-800/30 border-white/5 hover:border-white/10'
                 }`}
               >
                 <div className="text-center">
-                  <div className="flex justify-center mb-1">
-                    <IconComponent className={`text-lg ${
+                  <div className="flex justify-center mb-0.5">
+                    <IconComponent className={`text-base ${
                       fileTypeFilter === filter.id ? 'text-indigo-400' : 'text-slate-400'
                     }`} />
                   </div>
-                  <div className="text-[10px] font-medium text-slate-300">{filter.label}</div>
-                  <div className={`text-[10px] font-bold mt-0.5 ${
+                  <div className="text-[9px] font-medium text-slate-300">{filter.label}</div>
+                  <div className={`text-[9px] font-bold mt-0.5 ${
                     fileTypeFilter === filter.id ? 'text-indigo-400' : 'text-slate-500'
                   }`}>
                     {fileTypeStats[filter.id] || 0}
@@ -577,45 +619,45 @@ function FileBrowser() {
           })}
         </div>
 
-        {/* View Toggle - Below Filter Cards */}
-        <div className="flex items-center justify-between pt-3 pb-2 border-t border-white/5">
-          <span className="text-xs text-slate-500">
+        {/* View Toggle - Below Filter Cards - Compact */}
+        <div className="flex items-center justify-between pt-2 pb-1.5 border-t border-white/5">
+          <span className="text-[10px] text-slate-500">
             {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
           </span>
-          <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/10">
+          <div className="flex bg-slate-800/50 rounded-md p-0.5 border border-white/10">
             <button
               onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
                 viewMode === 'grid' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <FiGrid className="text-sm" />
-              <span>Grid</span>
+              <FiGrid className="text-xs" />
+              <span className="hidden xs:inline">Grid</span>
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
                 viewMode === 'list' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <FiList className="text-sm" />
-              <span>List</span>
+              <FiList className="text-xs" />
+              <span className="hidden xs:inline">List</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Upload Progress */}
+      {/* Upload Progress - Compact */}
       {(loading || isUploading) && uploadProgress > 0 && (
-        <div className="mb-4 p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl" role="status">
-          <div className="flex items-center gap-3">
-            <FiCloud className="text-indigo-400 text-sm animate-pulse" />
+        <div className="mb-3 p-2 bg-indigo-500/5 border border-indigo-500/20 rounded-lg" role="status">
+          <div className="flex items-center gap-2">
+            <FiCloud className="text-indigo-400 text-xs animate-pulse" />
             <div className="flex-1">
-              <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
+              <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
                 <span>Uploading...</span>
                 <span className="font-medium text-indigo-400">{Math.round(uploadProgress)}%</span>
               </div>
-              <div className="h-1.5 bg-slate-800/50 rounded-full overflow-hidden">
+              <div className="h-1 bg-slate-800/50 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all"
                   style={{ width: `${uploadProgress}%` }}
@@ -626,15 +668,15 @@ function FileBrowser() {
         </div>
       )}
 
-      {/* Error Message */}
+      {/* Error Message - Compact */}
       {error && (
-        <div className="mb-4 p-3 bg-red-500/5 border border-red-500/20 rounded-xl flex items-center justify-between" role="alert">
+        <div className="mb-3 p-2 bg-red-500/5 border border-red-500/20 rounded-lg flex items-center justify-between" role="alert">
           <div className="flex items-center gap-2">
-            <FiX className="text-red-400 text-sm" />
-            <span className="text-red-400 text-sm">{error}</span>
+            <FiX className="text-red-400 text-xs" />
+            <span className="text-red-400 text-xs">{error}</span>
           </div>
-          <button onClick={clearError} className="text-red-400 hover:text-white p-1.5 rounded-lg hover:bg-red-500/10 transition-all">
-            <FiX className="text-sm" />
+          <button onClick={clearError} className="text-red-400 hover:text-white p-1 rounded-md hover:bg-red-500/10 transition-all">
+            <FiX className="text-xs" />
           </button>
         </div>
       )}
@@ -644,9 +686,9 @@ function FileBrowser() {
         filteredFiles.length === 0 ? (
           /* Grid Empty State - Compact */
           <div className="h-full flex items-center justify-center">
-            <div className="text-center py-8">
-              <div className="w-12 h-12 mx-auto mb-3 bg-slate-800/50 rounded-xl flex items-center justify-center">
-                <FiCloud className="text-2xl text-slate-600" />
+            <div className="text-center py-6">
+              <div className="w-10 h-10 mx-auto mb-2 bg-slate-800/50 rounded-lg flex items-center justify-center">
+                <FiCloud className="text-xl text-slate-600" />
               </div>
               <p className="text-slate-400 text-xs mb-2">
                 {debouncedSearch ? 'No files match your search' : 'This folder is empty'}
@@ -664,7 +706,7 @@ function FileBrowser() {
           </div>
         ) : (
           /* Grid View */
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 mb-20">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2 mb-20">
           {/* Folders */}
           {folders.map((folder) => (
             <div
@@ -771,7 +813,7 @@ function FileBrowser() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      downloadFile(file.filename, token);
+                      downloadFile(file.filename, token, currentEnvironment);
                     }}
                     className="p-1.5 bg-slate-900/90 backdrop-blur-sm rounded-lg text-slate-400 hover:text-green-400 transition-all"
                   >
@@ -960,7 +1002,7 @@ function FileBrowser() {
               <button
                 onClick={() => {
                   selectedFiles.forEach(file => {
-                    if (file.type !== 'folder') downloadFile(file.filename, token);
+                    if (file.type !== 'folder') downloadFile(file.filename, token, currentEnvironment);
                   });
                 }}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 hover:text-indigo-200 transition-all text-[10px] font-medium ${
@@ -1030,7 +1072,7 @@ function FileBrowser() {
                     e.preventDefault();
                     const droppedFiles = Array.from(e.dataTransfer.files);
                     if (droppedFiles.length > 0) {
-                      uploadMultiple(droppedFiles, token);
+                      uploadMultiple(droppedFiles, token, currentEnvironment);
                       setUploadModalOpen(false);
                     }
                   }}
