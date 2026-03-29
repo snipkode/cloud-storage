@@ -86,6 +86,7 @@ const apiKeyMiddleware = async (req, res, next) => {
         });
       }
     }
+    // Note: Keys without encryptedKey (old keys) are allowed for backward compatibility
 
     // Update usage stats (non-blocking)
     apiKeyStore.updateApiKeyUsage(keyHash);
@@ -126,9 +127,19 @@ const requirePermission = (permission) => {
 
     // If authenticated via API key, check permissions
     if (req.user && req.user.authMethod === 'api-key') {
-      const hasPermission = apiKeyStore.hasPermission(req.user, permission);
+      const userPerms = req.user.permissions || [];
+      const hasPerm = apiKeyStore.hasPermission(req.user, permission);
+      
+      // Debug log
+      console.log('Permission check:', {
+        required: permission,
+        userPerms,
+        hasPerm,
+        active: req.user.active,
+        admin: userPerms.includes('admin')
+      });
 
-      if (!hasPermission) {
+      if (!hasPerm) {
         return res.status(403).json({
           error: 'Forbidden',
           message: `API key does not have '${permission}' permission`,
