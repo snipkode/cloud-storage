@@ -29,8 +29,9 @@ Thumbs.db
 *.swp
 *.swo
 
-# Uploads (optional - exclude if you don't want to track files)
+# Uploads (exclude all upload folders)
 server/uploads/
+server/test-uploads/
 
 # Temporary files
 tmp/
