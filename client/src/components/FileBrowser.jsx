@@ -499,18 +499,20 @@ function FileBrowser() {
               key={folder.id || folder.filename}
               onDoubleClick={() => handleDoubleClick(folder)}
               onClick={(e) => handleSelect(folder, e.ctrlKey || e.metaKey)}
-              className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
+              className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
                 selectedFiles.includes(folder)
                   ? 'border-indigo-500 bg-indigo-500/10'
                   : 'border-white/5 hover:border-indigo-500/30'
               }`}
             >
-              <div className="w-14 h-14 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-xl flex items-center justify-center">
-                <FiFolder className="text-amber-400 text-2xl" />
+              <div className="w-12 h-12 mt-2 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                <FiFolder className="text-amber-400 text-xl" />
               </div>
-              <span className="text-xs text-slate-300 font-medium text-center line-clamp-2 px-2">
-                {folder.originalname || folder.name}
-              </span>
+              <div className="flex-1 w-full px-2 py-1 flex items-center justify-center">
+                <span className="text-xs text-slate-300 font-medium text-center line-clamp-2 break-all">
+                  {folder.originalname || folder.name}
+                </span>
+              </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -532,19 +534,21 @@ function FileBrowser() {
                 key={file.id || file.filename}
                 onDoubleClick={() => handleDoubleClick(file)}
                 onClick={(e) => handleSelect(file, e.ctrlKey || e.metaKey)}
-                className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
+                className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
                   selectedFiles.includes(file)
                     ? 'border-indigo-500 bg-indigo-500/10'
                     : 'border-white/5 hover:border-indigo-500/30'
                 }`}
               >
-                <div className={`w-14 h-14 ${fileIcon.bg} rounded-xl flex items-center justify-center`}>
-                  <IconComponent className={`${fileIcon.color} text-2xl`} />
+                <div className={`w-12 h-12 mt-2 ${fileIcon.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                  <IconComponent className={`${fileIcon.color} text-xl`} />
                 </div>
-                <span className="text-xs text-slate-300 font-medium text-center line-clamp-2 px-2">
-                  {file.originalname || file.filename}
-                </span>
-                <span className="text-[10px] text-slate-500">{formatSize(file.size)}</span>
+                <div className="flex-1 w-full px-2 py-1 flex flex-col items-center justify-center gap-0.5 min-h-0">
+                  <span className="text-xs text-slate-300 font-medium text-center line-clamp-2 break-all w-full">
+                    {file.originalname || file.filename}
+                  </span>
+                  <span className="text-[10px] text-slate-500 flex-shrink-0">{formatSize(file.size)}</span>
+                </div>
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                   <button
                     onClick={(e) => {
@@ -573,7 +577,7 @@ function FileBrowser() {
       ) : (
         /* List View */
         <div className="bg-slate-800/30 border border-white/5 rounded-xl overflow-hidden">
-          <table className="w-full">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-white/5">
                 <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-10">
@@ -584,9 +588,9 @@ function FileBrowser() {
                     className="rounded border-slate-600 bg-slate-700/50 text-indigo-500 focus:ring-indigo-500/50 w-4 h-4"
                   />
                 </th>
-                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Name</th>
-                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 hidden sm:table-cell">Size</th>
-                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 hidden md:table-cell">Modified</th>
+                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-auto">Name</th>
+                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-24 hidden sm:table-cell">Size</th>
+                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-32 hidden md:table-cell">Modified</th>
                 <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-20">Actions</th>
               </tr>
             </thead>
@@ -611,10 +615,10 @@ function FileBrowser() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
                         <FiFolder className="text-amber-400 text-lg" />
                       </div>
-                      <span className="text-sm text-slate-300 font-medium truncate max-w-xs">
+                      <span className="text-sm text-slate-300 font-medium truncate max-w-full">
                         {folder.originalname || folder.name}
                       </span>
                     </div>
@@ -660,11 +664,11 @@ function FileBrowser() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 ${fileIcon.bg} rounded-lg flex items-center justify-center`}>
+                        <div className={`w-10 h-10 ${fileIcon.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
                           <IconComponent className={`${fileIcon.color} text-lg`} />
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-sm text-slate-300 font-medium truncate max-w-xs">
+                        <div className="min-w-0 max-w-full">
+                          <div className="text-sm text-slate-300 font-medium truncate max-w-full">
                             {file.originalname || file.filename}
                           </div>
                           <div className="text-xs text-slate-500 sm:hidden">{formatSize(file.size)}</div>
