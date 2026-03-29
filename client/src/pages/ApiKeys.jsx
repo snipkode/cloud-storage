@@ -464,8 +464,8 @@ function ApiKeys() {
                   }}
                 >
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-white font-medium text-sm">{key.name}</span>
-                    <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium flex items-center gap-1 ${
+                    <span className="text-white font-medium text-sm truncate max-w-[200px]">{key.name}</span>
+                    <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium flex items-center gap-1 flex-shrink-0 ${
                       key.active
                         ? 'bg-green-500/10 text-green-400 border border-green-500/30'
                         : 'bg-red-500/10 text-red-400 border border-red-500/30'
@@ -475,7 +475,7 @@ function ApiKeys() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-slate-500 flex-wrap mt-0.5">
-                    <span className={`font-mono px-1.5 py-0.5 rounded border flex items-center gap-1 ${
+                    <span className={`font-mono px-1.5 py-0.5 rounded border flex items-center gap-1 flex-shrink-0 ${
                       key.environment === 'test'
                         ? 'bg-amber-500/5 border-amber-500/20 text-amber-400'
                         : 'bg-green-500/5 border-green-500/20 text-green-400'
@@ -483,12 +483,12 @@ function ApiKeys() {
                       <span>{key.environment === 'test' ? '🧪' : '🚀'}</span>
                       {key.id?.slice(0, 8)}
                     </span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 flex-shrink-0">
                       <FiActivity className="text-[10px]" />
                       {key.usageCount || 0}
                     </span>
                     {key.lastUsedAt && (
-                      <span>• {new Date(key.lastUsedAt).toLocaleDateString()}</span>
+                      <span className="truncate">{new Date(key.lastUsedAt).toLocaleDateString()}</span>
                     )}
                   </div>
                 </div>
