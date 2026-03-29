@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   FiGrid, FiList, FiPlus, FiSearch, FiMoreVertical, FiDownload,
   FiTrash2, FiFolder, FiX, FiUpload, FiCheck, FiCloud, FiFile,
-  FiImage, FiFilm, FiMusic, FiCode, FiSettings, FiBook, FiBarChart, FiInfo
+  FiImage, FiFilm, FiMusic, FiCode, FiSettings, FiBook, FiBarChart, FiInfo,
+  FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useFilesStore } from '@store/filesStore';
@@ -72,6 +73,12 @@ function FileBrowser() {
 
   // Selection state
   const [selectedFiles, setSelectedFiles] = useState([]);
+
+  // Preview/Lightbox state
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [previewFiles, setPreviewFiles] = useState([]);
+  const [zoom, setZoom] = useState(1);
 
   // Modal state
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
@@ -324,6 +331,53 @@ function FileBrowser() {
     }
   };
 
+  // Check if file is previewable (image or PDF)
+  const isPreviewable = (file) => {
+    const mime = file.mimetype?.toLowerCase() || '';
+    const ext = (file.originalname || file.filename || '').toLowerCase();
+    return mime.includes('image') || mime.includes('pdf') || 
+           ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png') || 
+           ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.pdf');
+  };
+
+  // Get previewable files from current view
+  const getPreviewableFiles = () => {
+    return filteredFiles.filter(f => isPreviewable(f));
+  };
+
+  // Open preview lightbox
+  const openPreview = (file) => {
+    const previewable = getPreviewableFiles();
+    const index = previewable.findIndex(f => f.id === file.id || f.filename === file.filename);
+    setPreviewFiles(previewable);
+    setPreviewIndex(index >= 0 ? index : 0);
+    setPreviewOpen(true);
+    setZoom(1);
+  };
+
+  // Navigate preview
+  const navigatePreview = (direction) => {
+    const newIndex = previewIndex + direction;
+    if (newIndex >= 0 && newIndex < previewFiles.length) {
+      setPreviewIndex(newIndex);
+      setZoom(1);
+    }
+  };
+
+  // Close preview
+  const closePreview = () => {
+    setPreviewOpen(false);
+    setPreviewFiles([]);
+    setPreviewIndex(0);
+    setZoom(1);
+  };
+
+  // Get preview URL
+  const getPreviewUrl = (file) => {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    return `${API_BASE}/api/download/${encodeURIComponent(file.filename)}`;
+  };
+
   // Loading skeleton
   if (loading && files.length === 0) {
     return (
@@ -569,20 +623,46 @@ function FileBrowser() {
           {fileList.map((file) => {
             const fileIcon = getFileIcon(file.mimetype, file.filename);
             const IconComponent = fileIcon.icon;
+            const previewable = isPreviewable(file);
+            const isImage = file.mimetype?.includes('image');
+            
             return (
               <div
                 key={file.id || file.filename}
                 onDoubleClick={() => handleDoubleClick(file)}
-                onClick={(e) => handleSelect(file, e.ctrlKey || e.metaKey)}
+                onClick={(e) => {
+                  if (previewable && e.ctrlKey) {
+                    e.preventDefault();
+                    openPreview(file);
+                  } else {
+                    handleSelect(file, e.ctrlKey || e.metaKey);
+                  }
+                }}
                 className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
                   selectedFiles.includes(file)
                     ? 'border-indigo-500 bg-indigo-500/10'
                     : 'border-white/5 hover:border-indigo-500/30'
                 }`}
               >
-                <div className={`w-12 h-12 mt-2 ${fileIcon.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                  <IconComponent className={`${fileIcon.color} text-xl`} />
-                </div>
+                {/* Thumbnail for images */}
+                {isImage ? (
+                  <div className="w-full h-32 mt-2 px-2 relative overflow-hidden rounded-lg">
+                    <img
+                      src={getPreviewUrl(file)}
+                      alt={file.originalname || file.filename}
+                      className="w-full h-full object-cover rounded-lg group-hover:scale-110 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                    {/* Preview indicator */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <FiZoomIn className="text-white text-xl" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`w-12 h-12 mt-2 ${fileIcon.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                    <IconComponent className={`${fileIcon.color} text-xl`} />
+                  </div>
+                )}
                 <div className="flex-1 w-full px-2 py-1 flex flex-col items-center justify-center gap-0.5 min-h-0">
                   <span className="text-xs text-slate-300 font-medium text-center line-clamp-2 break-all w-full">
                     {file.originalname || file.filename}
@@ -590,6 +670,18 @@ function FileBrowser() {
                   <span className="text-[10px] text-slate-500 flex-shrink-0">{formatSize(file.size)}</span>
                 </div>
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  {previewable && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPreview(file);
+                      }}
+                      className="p-1.5 bg-slate-900/90 backdrop-blur-sm rounded-lg text-slate-400 hover:text-indigo-400 transition-all"
+                      title="Preview"
+                    >
+                      <FiZoomIn className="text-xs" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -925,6 +1017,94 @@ function FileBrowser() {
                 Create
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Lightbox Modal */}
+      {previewOpen && previewFiles.length > 0 && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center z-[200]" onClick={closePreview}>
+          {/* Close button */}
+          <button
+            onClick={closePreview}
+            className="absolute top-4 right-4 p-3 bg-slate-800/80 hover:bg-slate-700 rounded-xl text-white z-[210] transition-all"
+          >
+            <FiX className="text-xl" />
+          </button>
+
+          {/* Navigation - Previous */}
+          {previewIndex > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); navigatePreview(-1); }}
+              className="absolute left-4 p-3 bg-slate-800/80 hover:bg-slate-700 rounded-xl text-white z-[210] transition-all"
+            >
+              <FiChevronLeft className="text-2xl" />
+            </button>
+          )}
+
+          {/* Navigation - Next */}
+          {previewIndex < previewFiles.length - 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); navigatePreview(1); }}
+              className="absolute right-4 p-3 bg-slate-800/80 hover:bg-slate-700 rounded-xl text-white z-[210] transition-all"
+            >
+              <FiChevronRight className="text-2xl" />
+            </button>
+          )}
+
+          {/* Zoom controls */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-800/80 rounded-xl px-4 py-2 z-[210]">
+            <button onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} className="p-2 hover:bg-slate-700 rounded-lg text-white">
+              <FiZoomOut className="text-lg" />
+            </button>
+            <span className="text-white text-sm font-medium min-w-[60px] text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button onClick={() => setZoom(z => Math.min(3, z + 0.25))} className="p-2 hover:bg-slate-700 rounded-lg text-white">
+              <FiZoomIn className="text-lg" />
+            </button>
+            <button onClick={() => setZoom(1)} className="p-2 hover:bg-slate-700 rounded-lg text-white text-xs">
+              Reset
+            </button>
+          </div>
+
+          {/* Image counter */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800/80 rounded-xl px-4 py-2 z-[210]">
+            <span className="text-white text-sm font-medium">
+              {previewIndex + 1} / {previewFiles.length}
+            </span>
+          </div>
+
+          {/* Preview content */}
+          <div className="max-w-[90vw] max-h-[90vh] flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+            {previewFiles[previewIndex].mimetype?.includes('pdf') ? (
+              /* PDF Preview */
+              <div className="w-full h-full max-w-4xl">
+                <iframe
+                  src={getPreviewUrl(previewFiles[previewIndex])}
+                  className="w-full h-[80vh] rounded-lg"
+                  title="PDF Preview"
+                />
+              </div>
+            ) : (
+              /* Image Preview */
+              <img
+                src={getPreviewUrl(previewFiles[previewIndex])}
+                alt={previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
+                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl transition-transform duration-200"
+                style={{ transform: `scale(${zoom})` }}
+              />
+            )}
+          </div>
+
+          {/* File info */}
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-center z-[210]">
+            <p className="text-white font-medium text-sm mb-1">
+              {previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
+            </p>
+            <p className="text-slate-400 text-xs">
+              {formatSize(previewFiles[previewIndex].size)}
+            </p>
           </div>
         </div>
       )}
