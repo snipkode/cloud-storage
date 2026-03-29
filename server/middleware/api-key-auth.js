@@ -1,5 +1,6 @@
 const { hashApiKey, isValidApiKeyFormat } = require('../lib/api-key-generator');
 const apiKeyStore = require('../lib/api-key-store');
+const { decrypt } = require('../lib/encryption');
 
 /**
  * Middleware to validate API Key
@@ -74,6 +75,18 @@ const apiKeyMiddleware = async (req, res, next) => {
       });
     }
 
+    // Verify encrypted key can be decrypted (for keys stored with encryption)
+    if (apiKeyRecord.encryptedKey) {
+      const decryptedKey = decrypt(apiKeyRecord.encryptedKey);
+      if (!decryptedKey || decryptedKey !== apiKey) {
+        console.error('API key decryption mismatch');
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Invalid API key'
+        });
+      }
+    }
+
     // Update usage stats (non-blocking)
     apiKeyStore.updateApiKeyUsage(keyHash);
 
@@ -92,7 +105,7 @@ const apiKeyMiddleware = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('API Key middleware error:', error.message);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Internal server error',
       message: 'Authentication failed'
     });
