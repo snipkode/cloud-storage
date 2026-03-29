@@ -64,6 +64,7 @@ function FileBrowser() {
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('fileBrowserView') || 'grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [fileTypeFilter, setFileTypeFilter] = useState('all');
 
   // Folder navigation state
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -143,7 +144,22 @@ function FileBrowser() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedFiles, showNewFolderModal, uploadModalOpen]);
 
-  // Filter files based on current folder and search (memoized)
+  // Helper to determine file type category
+  const getFileTypeCategory = (mimetype, filename) => {
+    const ext = filename?.toLowerCase() || '';
+    const mime = mimetype?.toLowerCase() || '';
+    
+    if (mime.includes('image') || mime.includes('video')) return 'media';
+    if (mime.includes('video')) return 'video';
+    if (mime.includes('audio')) return 'audio';
+    if (mime.includes('pdf') || ext.endsWith('.pdf')) return 'pdf';
+    if (mime.includes('word') || ext.endsWith('.doc') || ext.endsWith('.docx')) return 'docs';
+    if (mime.includes('excel') || ext.endsWith('.xls') || ext.endsWith('.xlsx')) return 'excel';
+    if (mime.includes('text') || ext.endsWith('.txt')) return 'txt';
+    return 'other';
+  };
+
+  // Filter files based on current folder, search and file type (memoized)
   const filteredFiles = useMemo(() => {
     return files.filter(file => {
       const matchesSearch = !debouncedSearch ||
@@ -151,9 +167,21 @@ function FileBrowser() {
       const matchesFolder = currentFolder
         ? file.path?.startsWith(currentFolder.path || '/')
         : (!file.path || file.path === '/');
-      return matchesSearch && matchesFolder;
+      
+      // Filter by file type
+      let matchesType = true;
+      if (fileTypeFilter !== 'all' && file.type !== 'folder') {
+        const fileCategory = getFileTypeCategory(file.mimetype, file.originalname || file.filename);
+        if (fileTypeFilter === 'media') {
+          matchesType = fileCategory === 'media' || fileCategory === 'video' || fileCategory === 'audio';
+        } else {
+          matchesType = fileCategory === fileTypeFilter;
+        }
+      }
+      
+      return matchesSearch && matchesFolder && matchesType;
     });
-  }, [files, debouncedSearch, currentFolder]);
+  }, [files, debouncedSearch, currentFolder, fileTypeFilter]);
 
   // Separate folders and files (memoized)
   const { folders, fileList } = useMemo(() => {
@@ -304,56 +332,87 @@ function FileBrowser() {
   return (
     <div className="h-full">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3 flex-1">
-          <div>
-            <h1 className="text-white font-semibold text-lg">
-              {currentFolder ? (currentFolder.originalname || currentFolder.name) : 'All Files'}
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {currentFolder ? 'Browse folder contents' : 'Manage and organize your files'}
-            </p>
+      <div className="space-y-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1">
+            <div>
+              <h1 className="text-white font-semibold text-lg">
+                {currentFolder ? (currentFolder.originalname || currentFolder.name) : 'All Files'}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {currentFolder ? 'Browse folder contents' : 'Manage and organize your files'}
+              </p>
+            </div>
+            <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-full hidden sm:inline">
+              {folders.length + fileList.length} items
+            </span>
           </div>
-          <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-full hidden sm:inline">
-            {folders.length + fileList.length} items
-          </span>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Search */}
+            <div className="relative">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
+              <input
+                type="search"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full sm:w-48 bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+              />
+            </div>
+
+            {/* View toggle */}
+            <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/10">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-md transition-all ${
+                  viewMode === 'grid' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+                aria-label="Grid view"
+              >
+                <FiGrid className="text-sm" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-all ${
+                  viewMode === 'list' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+                aria-label="List view"
+              >
+                <FiList className="text-sm" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* File Type Filter */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {[
+            { id: 'all', label: 'All', icon: '📁' },
+            { id: 'media', label: 'Media', icon: '🖼️' },
+            { id: 'video', label: 'Video', icon: '🎬' },
+            { id: 'audio', label: 'Audio', icon: '🎵' },
+            { id: 'pdf', label: 'PDF', icon: '📕' },
+            { id: 'docs', label: 'Docs', icon: '📘' },
+            { id: 'excel', label: 'Excel', icon: '📗' },
+            { id: 'txt', label: 'TXT', icon: '📄' },
+          ].map((filter) => (
+            <button
+              key={filter.id}
+              onClick={() => setFileTypeFilter(filter.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                fileTypeFilter === filter.id
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  : 'bg-slate-800/50 text-slate-400 hover:text-white border border-white/5'
+              }`}
+            >
+              <span>{filter.icon}</span>
+              <span>{filter.label}</span>
+            </button>
+          ))}
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="relative">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
-            <input
-              type="search"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full sm:w-48 bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
-            />
-          </div>
-
-          {/* View toggle */}
-          <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/10">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-md transition-all ${
-                viewMode === 'grid' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-              aria-label="Grid view"
-            >
-              <FiGrid className="text-sm" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-md transition-all ${
-                viewMode === 'list' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-              aria-label="List view"
-            >
-              <FiList className="text-sm" />
-            </button>
-          </div>
-
           {/* Upload */}
           <button
             onClick={() => setUploadModalOpen(true)}
