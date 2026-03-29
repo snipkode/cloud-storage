@@ -1,37 +1,29 @@
-# Dependencies
-node_modules/
-package-lock.json
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
 
-# Environment variables
+# Environment
 .env
 .env.local
-.env.*.local
+.env.production
 
-# Firebase credentials
-server/firebase-service-key.json
-client/src/lib/firebase-config.js
+# SSL certificates
+ssl/
 
-# Build output
-dist/
-build/
+# Service account key (contains sensitive credentials)
+serviceAccountKey.json
+
+# Uploaded files
+uploads/
 
 # Logs
+logs/
 *.log
-npm-debug.log*
 
-# OS files
-.DS_Store
-Thumbs.db
+# Nginx
+nginx.conf
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Uploads (optional - exclude if you don't want to track files)
-server/uploads/
-
-# Temporary files
-tmp/
-temp/
+# Documentation
+DEPLOYMENT.md
