@@ -924,40 +924,72 @@ function FileBrowser() {
         </div>
       )}
 
-      {/* Status Bar - Compact */}
+      {/* Status Bar - 2 Row Compact Design */}
       {selectedFiles.length > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
-          <div className="bg-slate-900/95 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2.5 flex items-center gap-3 shadow-2xl whitespace-nowrap">
-            <span className="text-xs text-slate-300 font-medium">
-              {selectedFiles.length} selected
-            </span>
-            <span className="text-xs text-slate-500">{formatSize(selectedSize)}</span>
-            <div className="h-3 w-px bg-slate-700"></div>
-            <button
-              onClick={() => {
-                selectedFiles.forEach(file => {
-                  if (file.type !== 'folder') downloadFile(file.filename, token);
-                });
-              }}
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors whitespace-nowrap flex items-center gap-1"
-            >
-              <FiDownload className="text-[10px]" />
-              Download
-            </button>
-            <button
-              onClick={() => setSelectedFiles([])}
-              className="text-xs text-slate-400 hover:text-white transition-colors whitespace-nowrap"
-            >
-              Clear
-            </button>
-            <button
-              onClick={handleDeleteSelected}
-              disabled={isDeleting}
-              className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 flex items-center gap-1 whitespace-nowrap"
-            >
-              <FiTrash2 className="text-[10px]" />
-              Delete
-            </button>
+          <div className="bg-slate-900/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2.5 shadow-2xl min-w-[280px]">
+            {/* Top Row - Info */}
+            <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white font-bold bg-indigo-500/20 px-2 py-0.5 rounded-full">
+                  {selectedFiles.length}
+                </span>
+                <span className="text-[10px] text-slate-400">selected</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono">{formatSize(selectedSize)}</span>
+            </div>
+
+            {/* Bottom Row - Actions */}
+            <div className="flex items-center gap-1.5">
+              {/* Preview */}
+              {selectedFiles.some(f => isPreviewable(f)) && (
+                <button
+                  onClick={() => {
+                    const previewableFile = selectedFiles.find(f => isPreviewable(f));
+                    if (previewableFile) openPreview(previewableFile);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-300 hover:text-purple-200 transition-all text-[10px] font-medium"
+                  title="Preview first selected file"
+                >
+                  <FiZoomIn className="text-xs" />
+                  Preview
+                </button>
+              )}
+
+              {/* Download */}
+              <button
+                onClick={() => {
+                  selectedFiles.forEach(file => {
+                    if (file.type !== 'folder') downloadFile(file.filename, token);
+                  });
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 hover:text-indigo-200 transition-all text-[10px] font-medium ${
+                  !selectedFiles.some(f => isPreviewable(f)) ? 'flex-1' : ''
+                }`}
+              >
+                <FiDownload className="text-xs" />
+                Download
+              </button>
+
+              {/* Clear */}
+              <button
+                onClick={() => setSelectedFiles([])}
+                className="p-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-400 hover:text-white transition-all"
+                title="Clear selection"
+              >
+                <FiX className="text-xs" />
+              </button>
+
+              {/* Delete */}
+              <button
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+                className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 hover:text-red-300 transition-all disabled:opacity-50"
+                title="Delete selected"
+              >
+                <FiTrash2 className="text-xs" />
+              </button>
+            </div>
           </div>
         </div>
       )}
