@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   FiGrid, FiList, FiPlus, FiSearch, FiMoreVertical, FiDownload,
   FiTrash2, FiFolder, FiX, FiUpload, FiCheck, FiCloud, FiFile,
-  FiImage, FiFilm, FiMusic, FiCode, FiSettings
+  FiImage, FiFilm, FiMusic, FiCode, FiSettings, FiBook, FiBarChart
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useFilesStore } from '@store/filesStore';
@@ -149,7 +149,7 @@ function FileBrowser() {
     const ext = filename?.toLowerCase() || '';
     const mime = mimetype?.toLowerCase() || '';
     
-    if (mime.includes('image') || mime.includes('video')) return 'media';
+    if (mime.includes('image')) return 'media';
     if (mime.includes('video')) return 'video';
     if (mime.includes('audio')) return 'audio';
     if (mime.includes('pdf') || ext.endsWith('.pdf')) return 'pdf';
@@ -158,6 +158,25 @@ function FileBrowser() {
     if (mime.includes('text') || ext.endsWith('.txt')) return 'txt';
     return 'other';
   };
+
+  // Calculate file type stats (memoized)
+  const fileTypeStats = useMemo(() => {
+    const stats = { all: 0, media: 0, video: 0, audio: 0, pdf: 0, docs: 0, excel: 0, txt: 0, other: 0 };
+    
+    files.forEach(file => {
+      if (file.type === 'folder') return;
+      
+      stats.all++;
+      const category = getFileTypeCategory(file.mimetype, file.originalname || file.filename);
+      if (stats[category] !== undefined) {
+        stats[category]++;
+      } else {
+        stats.other++;
+      }
+    });
+    
+    return stats;
+  }, [files]);
 
   // Filter files based on current folder, search and file type (memoized)
   const filteredFiles = useMemo(() => {
@@ -385,31 +404,48 @@ function FileBrowser() {
           </div>
         </div>
 
-        {/* File Type Filter */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {/* File Type Filter - Grid Cards */}
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
           {[
-            { id: 'all', label: 'All', icon: '📁' },
-            { id: 'media', label: 'Media', icon: '🖼️' },
-            { id: 'video', label: 'Video', icon: '🎬' },
-            { id: 'audio', label: 'Audio', icon: '🎵' },
-            { id: 'pdf', label: 'PDF', icon: '📕' },
-            { id: 'docs', label: 'Docs', icon: '📘' },
-            { id: 'excel', label: 'Excel', icon: '📗' },
-            { id: 'txt', label: 'TXT', icon: '📄' },
-          ].map((filter) => (
-            <button
-              key={filter.id}
-              onClick={() => setFileTypeFilter(filter.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                fileTypeFilter === filter.id
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  : 'bg-slate-800/50 text-slate-400 hover:text-white border border-white/5'
-              }`}
-            >
-              <span>{filter.icon}</span>
-              <span>{filter.label}</span>
-            </button>
-          ))}
+            { id: 'all', label: 'All', icon: FiFolder, color: 'from-slate-500 to-slate-600' },
+            { id: 'media', label: 'Media', icon: FiImage, color: 'from-pink-500 to-rose-500' },
+            { id: 'video', label: 'Video', icon: FiFilm, color: 'from-purple-500 to-violet-500' },
+            { id: 'audio', label: 'Audio', icon: FiMusic, color: 'from-amber-500 to-orange-500' },
+            { id: 'pdf', label: 'PDF', icon: FiBook, color: 'from-red-500 to-rose-500' },
+            { id: 'docs', label: 'Docs', icon: FiFile, color: 'from-blue-500 to-indigo-500' },
+            { id: 'excel', label: 'Excel', icon: FiBarChart, color: 'from-emerald-500 to-green-500' },
+            { id: 'txt', label: 'TXT', icon: FiFile, color: 'from-cyan-500 to-teal-500' },
+          ].map((filter) => {
+            const IconComponent = filter.icon;
+            return (
+              <button
+                key={filter.id}
+                onClick={() => setFileTypeFilter(filter.id)}
+                className={`relative p-2 rounded-xl border transition-all overflow-hidden group ${
+                  fileTypeFilter === filter.id
+                    ? 'bg-slate-800/80 border-indigo-500/50 shadow-lg shadow-indigo-500/20'
+                    : 'bg-slate-800/30 border-white/5 hover:border-white/10'
+                }`}
+              >
+                <div className="text-center">
+                  <div className="flex justify-center mb-1">
+                    <IconComponent className={`text-lg ${
+                      fileTypeFilter === filter.id ? 'text-indigo-400' : 'text-slate-400'
+                    }`} />
+                  </div>
+                  <div className="text-[10px] font-medium text-slate-300">{filter.label}</div>
+                  <div className={`text-[10px] font-bold mt-0.5 ${
+                    fileTypeFilter === filter.id ? 'text-indigo-400' : 'text-slate-500'
+                  }`}>
+                    {fileTypeStats[filter.id] || 0}
+                  </div>
+                </div>
+                {fileTypeFilter === filter.id && (
+                  <div className={`absolute inset-0 bg-gradient-to-br ${filter.color} opacity-10`}></div>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-2">
