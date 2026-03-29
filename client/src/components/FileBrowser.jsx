@@ -633,7 +633,8 @@ function FileBrowser() {
                         e.stopPropagation();
                         setContextMenu({ x: e.clientX, y: e.clientY, item: folder });
                       }}
-                      className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
+                      className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                      title="More options"
                     >
                       <FiMoreVertical className="text-sm" />
                     </button>
@@ -682,13 +683,14 @@ function FileBrowser() {
                       {formatRelativeTime(file.createdAt)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             downloadFile(file.filename);
                           }}
                           className="p-2 hover:bg-green-600/20 rounded-lg text-slate-400 hover:text-green-400 transition-all"
+                          title="Download"
                         >
                           <FiDownload className="text-sm" />
                         </button>
@@ -698,6 +700,7 @@ function FileBrowser() {
                             setContextMenu({ x: e.clientX, y: e.clientY, item: file });
                           }}
                           className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
+                          title="More options"
                         >
                           <FiMoreVertical className="text-sm" />
                         </button>
