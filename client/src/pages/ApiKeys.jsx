@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   FiKey, FiPlus, FiTrash2, FiLock, FiCopy, FiCheck,
-  FiX, FiActivity, FiCode, FiSearch, FiXCircle,
+  FiX, FiActivity, FiSearch, FiXCircle,
   FiBook, FiShield, FiClock, FiServer, FiUnlock
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
@@ -549,21 +549,6 @@ function ApiKeys() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Pass the actual API key value (only available right after creation)
-                      const keyValue = key.key || key.apiKey || '';
-                      setSelectedKey({ ...key, key: keyValue });
-                      setCodeLang('curl');
-                      setExampleIdx(0);
-                      setShowCodeModal(true);
-                    }}
-                    className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
-                    title="View Code Examples"
-                  >
-                    <FiCode className="text-sm" />
-                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
