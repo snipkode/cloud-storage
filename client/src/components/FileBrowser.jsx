@@ -23,7 +23,7 @@ const EnvironmentToggle = ({ environment, onEnvironmentChange }) => {
         }`}
       >
         <span className="text-[10px]">🧪</span>
-        <span className="hidden xs:inline">Sandbox</span>
+        <span>Sandbox</span>
       </button>
       <button
         onClick={() => onEnvironmentChange('live')}
@@ -34,7 +34,7 @@ const EnvironmentToggle = ({ environment, onEnvironmentChange }) => {
         }`}
       >
         <span className="text-[10px]">🚀</span>
-        <span className="hidden xs:inline">Production</span>
+        <span>Production</span>
       </button>
     </div>
   );
@@ -250,10 +250,10 @@ function FileBrowser() {
   const getFileTypeCategory = (mimetype, filename) => {
     const ext = filename?.toLowerCase() || '';
     const mime = mimetype?.toLowerCase() || '';
-    
-    if (mime.includes('image')) return 'media';
-    if (mime.includes('video')) return 'video';
-    if (mime.includes('audio')) return 'audio';
+
+    if (mime.includes('image') || ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png') || ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.bmp') || ext.endsWith('.svg')) return 'photo';
+    if (mime.includes('video') || ext.endsWith('.mp4') || ext.endsWith('.avi') || ext.endsWith('.mov') || ext.endsWith('.mkv') || ext.endsWith('.webm') || ext.endsWith('.flv') || ext.endsWith('.wmv')) return 'video';
+    if (mime.includes('audio') || ext.endsWith('.mp3') || ext.endsWith('.wav') || ext.endsWith('.ogg') || ext.endsWith('.flac') || ext.endsWith('.aac') || ext.endsWith('.m4a')) return 'audio';
     if (mime.includes('pdf') || ext.endsWith('.pdf')) return 'pdf';
     if (mime.includes('word') || ext.endsWith('.doc') || ext.endsWith('.docx')) return 'docs';
     if (mime.includes('excel') || ext.endsWith('.xls') || ext.endsWith('.xlsx')) return 'excel';
@@ -263,11 +263,11 @@ function FileBrowser() {
 
   // Calculate file type stats (memoized)
   const fileTypeStats = useMemo(() => {
-    const stats = { all: 0, media: 0, video: 0, audio: 0, pdf: 0, docs: 0, excel: 0, txt: 0, other: 0 };
-    
+    const stats = { all: 0, photo: 0, video: 0, audio: 0, pdf: 0, docs: 0, excel: 0, txt: 0, other: 0 };
+
     files.forEach(file => {
       if (file.type === 'folder') return;
-      
+
       stats.all++;
       const category = getFileTypeCategory(file.mimetype, file.originalname || file.filename);
       if (stats[category] !== undefined) {
@@ -276,7 +276,7 @@ function FileBrowser() {
         stats.other++;
       }
     });
-    
+
     return stats;
   }, [files]);
 
@@ -293,11 +293,7 @@ function FileBrowser() {
       let matchesType = true;
       if (fileTypeFilter !== 'all' && file.type !== 'folder') {
         const fileCategory = getFileTypeCategory(file.mimetype, file.originalname || file.filename);
-        if (fileTypeFilter === 'media') {
-          matchesType = fileCategory === 'media' || fileCategory === 'video' || fileCategory === 'audio';
-        } else {
-          matchesType = fileCategory === fileTypeFilter;
-        }
+        matchesType = fileCategory === fileTypeFilter;
       }
       
       return matchesSearch && matchesFolder && matchesType;
@@ -521,10 +517,11 @@ function FileBrowser() {
     <div className="h-full">
       {/* Toolbar */}
       <div className="space-y-2">
-        {/* Top Bar: Title + Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="min-w-0">
+        {/* Top Bar: Title + Environment */}
+        <div className="flex flex-col gap-2 pb-2 border-b border-white/5">
+          {/* Title Row */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
               <h1 className="text-white font-semibold text-base truncate">
                 {currentFolder ? (currentFolder.originalname || currentFolder.name) : 'All Files'}
               </h1>
@@ -537,49 +534,83 @@ function FileBrowser() {
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap flex-shrink-0">
-            {/* Environment Toggle - Compact */}
+          {/* Environment Toggle */}
+          <div className="flex items-center">
             <EnvironmentToggle
               environment={currentEnvironment}
               onEnvironmentChange={handleEnvironmentChange}
             />
+          </div>
+        </div>
+
+        {/* Action Buttons Row - Mobile: Stacked (View Toggle on top, Upload/New Folder below), Desktop: Inline */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {/* Top Row: View Toggle (Mobile) / Right: View Toggle (Desktop) */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 border-b sm:border-b-0 border-white/5 pb-2 sm:pb-0 order-first">
+            <span className="text-[10px] text-slate-500">
+              {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
+            </span>
+            <div className="flex bg-slate-800/50 rounded-md p-0.5 border border-white/10">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
+                  viewMode === 'grid' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <FiGrid className="text-xs" />
+                <span className="hidden xs:inline">Grid</span>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
+                  viewMode === 'list' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <FiList className="text-xs" />
+                <span className="hidden xs:inline">List</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Row: Upload & New Folder (Mobile) / Left: Upload & New Folder (Desktop) */}
+          <div className="flex items-center gap-2 flex-1 order-last sm:order-first">
             {/* Upload */}
             <button
               onClick={() => setUploadModalOpen(true)}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-lg shadow-indigo-500/25 min-w-[72px] justify-center"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg shadow-indigo-500/25 min-w-[100px]"
             >
               <FiUpload className="text-xs" />
-              <span className="hidden sm:inline">Upload</span>
+              <span>Upload</span>
             </button>
 
             {/* New Folder */}
             <button
               onClick={() => setShowNewFolderModal(true)}
-              className="flex items-center gap-1.5 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all min-w-[72px] justify-center"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white px-3 py-2 rounded-lg text-xs font-medium transition-all min-w-[100px]"
             >
               <FiPlus className="text-xs" />
-              <span className="hidden sm:inline">New Folder</span>
+              <span>New Folder</span>
             </button>
-
-            {/* Search - Compact */}
-            <div className="relative w-full sm:w-48">
-              <FiSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs" />
-              <input
-                type="search"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800/50 border border-white/10 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
-              />
-            </div>
           </div>
+        </div>
+
+        {/* Search - Above File Type Filter */}
+        <div className="relative">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs" />
+          <input
+            type="search"
+            placeholder="Search files..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-800/50 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+          />
         </div>
 
         {/* File Type Filter - Grid Cards - Compact */}
         <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
           {[
             { id: 'all', label: 'All', icon: FiFolder, color: 'from-slate-500 to-slate-600' },
-            { id: 'media', label: 'Media', icon: FiImage, color: 'from-pink-500 to-rose-500' },
+            { id: 'photo', label: 'Photo', icon: FiImage, color: 'from-pink-500 to-rose-500' },
             { id: 'video', label: 'Video', icon: FiFilm, color: 'from-purple-500 to-violet-500' },
             { id: 'audio', label: 'Audio', icon: FiMusic, color: 'from-amber-500 to-orange-500' },
             { id: 'pdf', label: 'PDF', icon: FiBook, color: 'from-red-500 to-rose-500' },
@@ -617,33 +648,6 @@ function FileBrowser() {
               </button>
             );
           })}
-        </div>
-
-        {/* View Toggle - Below Filter Cards - Compact */}
-        <div className="flex items-center justify-between pt-2 pb-1.5 border-t border-white/5">
-          <span className="text-[10px] text-slate-500">
-            {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
-          </span>
-          <div className="flex bg-slate-800/50 rounded-md p-0.5 border border-white/10">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
-                viewMode === 'grid' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <FiGrid className="text-xs" />
-              <span className="hidden xs:inline">Grid</span>
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
-                viewMode === 'list' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <FiList className="text-xs" />
-              <span className="hidden xs:inline">List</span>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -706,7 +710,7 @@ function FileBrowser() {
           </div>
         ) : (
           /* Grid View */
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2 mb-20">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2 mt-3 mb-20">
           {/* Folders */}
           {folders.map((folder) => (
             <div
@@ -836,7 +840,7 @@ function FileBrowser() {
         )
       ) : (
         /* List View */
-        <div className="bg-slate-800/30 border border-white/5 rounded-xl overflow-visible mb-20">
+        <div className="bg-slate-800/30 border border-white/5 rounded-xl overflow-visible mt-3 mb-20">
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-white/5">
