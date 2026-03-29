@@ -145,10 +145,11 @@ function ApiKeys() {
       });
       const data = await res.json();
       if (res.ok) {
-        // Map API keys to ensure key property exists
+        // Map API keys - don't use id as key, key is only shown once after creation
         const mappedKeys = (data.apiKeys || []).map(key => ({
           ...key,
-          key: key.key || key.apiKey || key.id || ''
+          key: key.key || key.apiKey || '', // Don't fallback to id
+          environment: key.environment || 'live'
         }));
         setApiKeys(mappedKeys);
       }
@@ -454,8 +455,8 @@ function ApiKeys() {
                 <div
                   className="flex-1 min-w-0 cursor-pointer"
                   onClick={() => {
-                    // Pass the actual API key value
-                    const keyValue = key.key || key.apiKey || key.id || '';
+                    // Pass the actual API key value (only available right after creation)
+                    const keyValue = key.key || key.apiKey || '';
                     setSelectedKey({ ...key, key: keyValue });
                     setCodeLang('curl');
                     setExampleIdx(0);
@@ -464,14 +465,6 @@ function ApiKeys() {
                 >
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-white font-medium text-sm">{key.name}</span>
-                    <span className={`px-2 py-0.5 text-[10px] rounded-md font-medium flex items-center gap-1 ${
-                      key.environment === 'test'
-                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                        : 'bg-green-500/10 text-green-400 border border-green-500/30'
-                    }`}>
-                      <span>{key.environment === 'test' ? '🧪' : '🚀'}</span>
-                      <span className="capitalize">{key.environment}</span>
-                    </span>
                     <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium flex items-center gap-1 ${
                       key.active
                         ? 'bg-green-500/10 text-green-400 border border-green-500/30'
@@ -482,7 +475,12 @@ function ApiKeys() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-slate-500 flex-wrap mt-0.5">
-                    <span className="font-mono bg-slate-800/50 px-1.5 py-0.5 rounded border border-white/5">
+                    <span className={`font-mono px-1.5 py-0.5 rounded border flex items-center gap-1 ${
+                      key.environment === 'test'
+                        ? 'bg-amber-500/5 border-amber-500/20 text-amber-400'
+                        : 'bg-green-500/5 border-green-500/20 text-green-400'
+                    }`}>
+                      <span>{key.environment === 'test' ? '🧪' : '🚀'}</span>
                       {key.id?.slice(0, 8)}
                     </span>
                     <span className="flex items-center gap-1">
@@ -516,8 +514,8 @@ function ApiKeys() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Pass the actual API key value
-                      const keyValue = key.key || key.apiKey || key.id || '';
+                      // Pass the actual API key value (only available right after creation)
+                      const keyValue = key.key || key.apiKey || '';
                       setSelectedKey({ ...key, key: keyValue });
                       setCodeLang('curl');
                       setExampleIdx(0);
