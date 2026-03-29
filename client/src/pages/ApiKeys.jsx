@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  FiKey, FiPlus, FiTrash2, FiLock, FiCopy, FiCheck,
+  FiKey, FiPlus, FiTrash2, FiLock, FiCopy, FiCheck, FiCode,
   FiX, FiActivity, FiSearch, FiXCircle, FiEye,
   FiBook, FiShield, FiClock, FiServer, FiUnlock
 } from 'react-icons/fi';

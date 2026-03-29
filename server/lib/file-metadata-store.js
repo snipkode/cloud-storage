@@ -16,7 +16,8 @@ const createFile = async (fileData) => {
     path: fileData.path,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    downloadCount: 0
+    downloadCount: 0,
+    environment: fileData.environment || 'live' // Add environment field
   };
 
   await db.collection(FILES_COLLECTION).doc(newFile.id).set(newFile);
@@ -27,10 +28,11 @@ const createFile = async (fileData) => {
 /**
  * Get file metadata by filename and userId
  */
-const getFileByFilename = async (filename, userId) => {
+const getFileByFilename = async (filename, userId, environment = 'live') => {
   const snapshot = await db.collection(FILES_COLLECTION)
     .where('filename', '==', filename)
     .where('userId', '==', userId)
+    .where('environment', '==', environment)
     .limit(1)
     .get();
 
@@ -43,10 +45,14 @@ const getFileByFilename = async (filename, userId) => {
 /**
  * Get file metadata by ID
  */
-const getFileById = async (id) => {
+const getFileById = async (id, environment = 'live') => {
   const doc = await db.collection(FILES_COLLECTION).doc(id).get();
 
   if (!doc.exists) return null;
+
+  const data = doc.data();
+  // Check environment match
+  if ((data.environment || 'live') !== environment) return null;
 
   return { id: doc.id, ...doc.data() };
 };
@@ -54,9 +60,10 @@ const getFileById = async (id) => {
 /**
  * Get all files for a user
  */
-const getUserFiles = async (userId) => {
+const getUserFiles = async (userId, environment = 'live') => {
   const snapshot = await db.collection(FILES_COLLECTION)
     .where('userId', '==', userId)
+    .where('environment', '==', environment)
     .orderBy('createdAt', 'desc')
     .get();
 
@@ -66,8 +73,8 @@ const getUserFiles = async (userId) => {
 /**
  * Update file download count
  */
-const incrementDownloadCount = async (filename, userId) => {
-  const file = await getFileByFilename(filename, userId);
+const incrementDownloadCount = async (filename, userId, environment = 'live') => {
+  const file = await getFileByFilename(filename, userId, environment);
   if (!file) return null;
 
   const updateData = {
@@ -83,8 +90,8 @@ const incrementDownloadCount = async (filename, userId) => {
 /**
  * Delete file metadata
  */
-const deleteFile = async (filename, userId) => {
-  const file = await getFileByFilename(filename, userId);
+const deleteFile = async (filename, userId, environment = 'live') => {
+  const file = await getFileByFilename(filename, userId, environment);
   if (!file) return false;
 
   await db.collection(FILES_COLLECTION).doc(file.id).delete();
@@ -95,9 +102,10 @@ const deleteFile = async (filename, userId) => {
 /**
  * Get storage stats for a user
  */
-const getStorageStats = async (userId) => {
+const getStorageStats = async (userId, environment = 'live') => {
   const snapshot = await db.collection(FILES_COLLECTION)
     .where('userId', '==', userId)
+    .where('environment', '==', environment)
     .get();
 
   let totalSize = 0;

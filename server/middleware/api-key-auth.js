@@ -96,7 +96,8 @@ const apiKeyMiddleware = async (req, res, next) => {
       authMethod: 'api-key',
       apiKeyId: apiKeyRecord.id,
       apiKeyName: apiKeyRecord.name,
-      permissions: apiKeyRecord.permissions
+      permissions: apiKeyRecord.permissions,
+      environment: apiKey.startsWith('cs_test_') ? 'test' : 'live'
     };
 
     // Store the required permission for this route

@@ -29,9 +29,16 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// Get user's tenant directory
-const getUserDir = (uid) => {
-  const userDir = path.join(UPLOADS_DIR, uid);
+// Test uploads directory (isolated from live)
+const TEST_UPLOADS_DIR = path.join(__dirname, '..', 'test-uploads');
+if (!fs.existsSync(TEST_UPLOADS_DIR)) {
+  fs.mkdirSync(TEST_UPLOADS_DIR, { recursive: true });
+}
+
+// Get user's directory based on environment
+const getUserDir = (uid, environment = 'live') => {
+  const baseDir = environment === 'test' ? TEST_UPLOADS_DIR : UPLOADS_DIR;
+  const userDir = path.join(baseDir, uid);
   if (!fs.existsSync(userDir)) {
     fs.mkdirSync(userDir, { recursive: true });
   }
@@ -41,7 +48,8 @@ const getUserDir = (uid) => {
 // Configure multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const userDir = getUserDir(req.user.uid);
+    const env = req.user?.environment || 'live';
+    const userDir = getUserDir(req.user.uid, env);
     cb(null, userDir);
   },
   filename: (req, file, cb) => {
@@ -68,6 +76,8 @@ router.post('/upload',
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    const env = req.user.environment || 'live';
+
     // Save metadata to Firestore
     const fileMetadata = await fileMetadataStore.createFile({
       filename: req.file.filename,
@@ -75,7 +85,8 @@ router.post('/upload',
       mimetype: req.file.mimetype,
       size: req.file.size,
       userId: req.user.uid,
-      path: req.file.path
+      path: req.file.path,
+      environment: env
     });
 
     res.status(201).json({
@@ -86,7 +97,8 @@ router.post('/upload',
         originalname: fileMetadata.originalname,
         size: fileMetadata.size,
         mimetype: fileMetadata.mimetype,
-        createdAt: fileMetadata.createdAt
+        createdAt: fileMetadata.createdAt,
+        environment: env
       }
     });
   } catch (error) {
@@ -105,6 +117,8 @@ router.post('/upload-multiple',
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
+    const env = req.user.environment || 'live';
+
     // Save all metadata to Firestore
     const uploadedFiles = [];
     for (const file of req.files) {
@@ -114,7 +128,8 @@ router.post('/upload-multiple',
         mimetype: file.mimetype,
         size: file.size,
         userId: req.user.uid,
-        path: file.path
+        path: file.path,
+        environment: env
       });
       uploadedFiles.push({
         id: fileMetadata.id,
@@ -122,7 +137,8 @@ router.post('/upload-multiple',
         originalname: fileMetadata.originalname,
         size: fileMetadata.size,
         mimetype: fileMetadata.mimetype,
-        createdAt: fileMetadata.createdAt
+        createdAt: fileMetadata.createdAt,
+        environment: env
       });
     }
 
@@ -142,7 +158,8 @@ router.get('/files',
   requirePermission('read'),
   async (req, res) => {
   try {
-    const files = await fileMetadataStore.getUserFiles(req.user.uid);
+    const env = req.user.environment || 'live';
+    const files = await fileMetadataStore.getUserFiles(req.user.uid, env);
 
     const totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
 
@@ -160,7 +177,8 @@ router.get('/files',
       total: files.length,
       stats: {
         totalFiles: files.length,
-        totalSize
+        totalSize,
+        environment: env
       }
     });
   } catch (error) {
@@ -175,8 +193,9 @@ router.get('/download/:filename',
   requirePermission('read'),
   async (req, res) => {
   try {
+    const env = req.user.environment || 'live';
+    const userDir = getUserDir(req.user.uid, env);
     const filename = req.params.filename;
-    const userDir = getUserDir(req.user.uid);
     const filePath = path.join(userDir, filename);
 
     if (!fs.existsSync(filePath)) {
@@ -184,7 +203,7 @@ router.get('/download/:filename',
     }
 
     // Update download count in Firestore
-    await fileMetadataStore.incrementDownloadCount(filename, req.user.uid);
+    await fileMetadataStore.incrementDownloadCount(filename, req.user.uid, env);
 
     res.download(filePath);
   } catch (error) {
@@ -199,8 +218,9 @@ router.delete('/delete/:filename',
   requirePermission('delete'),
   async (req, res) => {
   try {
+    const env = req.user.environment || 'live';
+    const userDir = getUserDir(req.user.uid, env);
     const filename = req.params.filename;
-    const userDir = getUserDir(req.user.uid);
     const filePath = path.join(userDir, filename);
 
     if (!fs.existsSync(filePath)) {
@@ -211,7 +231,7 @@ router.delete('/delete/:filename',
     fs.unlinkSync(filePath);
 
     // Delete metadata from Firestore
-    await fileMetadataStore.deleteFile(filename, req.user.uid);
+    await fileMetadataStore.deleteFile(filename, req.user.uid, env);
 
     res.json({ message: 'File deleted successfully' });
   } catch (error) {
@@ -226,26 +246,27 @@ router.get('/file/:filename',
   requirePermission('read'),
   async (req, res) => {
   try {
+    const env = req.user.environment || 'live';
     const filename = req.params.filename;
-    
+
     // Get metadata from Firestore
-    const fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid);
+    const fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
 
     if (!fileMetadata) {
       return res.status(404).json({ error: 'File not found' });
     }
 
     // Verify physical file exists
-    const userDir = getUserDir(req.user.uid);
+    const userDir = getUserDir(req.user.uid, env);
     const filePath = path.join(userDir, filename);
-    
+
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'File not found on disk' });
     }
 
     const stats = fs.statSync(filePath);
-    
-    res.json({ 
+
+    res.json({
       file: {
         id: fileMetadata.id,
         filename: fileMetadata.filename,
@@ -254,8 +275,9 @@ router.get('/file/:filename',
         mimetype: fileMetadata.mimetype,
         createdAt: fileMetadata.createdAt,
         updatedAt: fileMetadata.updatedAt,
-        downloadCount: fileMetadata.downloadCount || 0
-      } 
+        downloadCount: fileMetadata.downloadCount || 0,
+        environment: env
+      }
     });
   } catch (error) {
     console.error('Get file info error:', error);
@@ -269,8 +291,9 @@ router.get('/storage-stats',
   requirePermission('read'),
   async (req, res) => {
   try {
-    const stats = await fileMetadataStore.getStorageStats(req.user.uid);
-    res.json(stats);
+    const env = req.user.environment || 'live';
+    const stats = await fileMetadataStore.getStorageStats(req.user.uid, env);
+    res.json({ ...stats, environment: env });
   } catch (error) {
     console.error('Storage stats error:', error);
     res.status(500).json({ error: 'Failed to get stats', details: error.message });
