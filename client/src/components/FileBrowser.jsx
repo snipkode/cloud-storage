@@ -210,7 +210,7 @@ function FileBrowser() {
       setCurrentFolder(item);
       setSelectedFiles([]);
     } else {
-      downloadFile(item.filename);
+      downloadFile(item.filename, token);
     }
   };
 
@@ -292,7 +292,7 @@ function FileBrowser() {
 
   // Handle download
   const handleDownload = (item) => {
-    downloadFile(item.filename);
+    downloadFile(item.filename, token);
     setContextMenu(null);
   };
 
@@ -553,7 +553,7 @@ function FileBrowser() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      downloadFile(file.filename);
+                      downloadFile(file.filename, token);
                     }}
                     className="p-1.5 bg-slate-900/90 backdrop-blur-sm rounded-lg text-slate-400 hover:text-green-400 transition-all"
                   >
@@ -718,7 +718,7 @@ function FileBrowser() {
             <button
               onClick={() => {
                 selectedFiles.forEach(file => {
-                  if (file.type !== 'folder') downloadFile(file.filename);
+                  if (file.type !== 'folder') downloadFile(file.filename, token);
                 });
               }}
               className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors whitespace-nowrap flex items-center gap-1"
