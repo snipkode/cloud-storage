@@ -34,13 +34,6 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ error: 'Token expired' });
     }
 
-    if (error.code === 'auth/argument-error') {
-      // Firebase Admin not properly configured, allow for development
-      console.warn('Firebase Admin not configured. Running in development mode.');
-      req.user = { uid: 'dev-user', email: 'dev@example.com', authMethod: 'firebase' };
-      return next();
-    }
-
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 };
