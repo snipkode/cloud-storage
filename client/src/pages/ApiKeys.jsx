@@ -340,7 +340,7 @@ function ApiKeys() {
       )}
 
       {/* Compact Filter Bar */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="space-y-3 mb-4">
         <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/5">
           {[
             { id: 'all', label: 'All', count: stats.total },
@@ -365,11 +365,11 @@ function ApiKeys() {
             </button>
           ))}
         </div>
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search by name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-800/50 border border-white/10 rounded-lg pl-9 pr-8 py-1.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-all"
