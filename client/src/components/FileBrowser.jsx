@@ -978,29 +978,50 @@ function FileBrowser() {
               key={folder.id || folder.filename}
               onDoubleClick={() => handleDoubleClick(folder)}
               onClick={(e) => handleClick(folder, e)}
-              className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
+              className={`group aspect-square bg-gradient-to-br from-slate-800/50 to-slate-900/50 hover:from-slate-700/40 hover:to-slate-800/40 border rounded-2xl flex flex-col items-center transition-all cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10 relative overflow-hidden ${
                 selectedFiles.includes(folder)
-                  ? 'border-indigo-500 bg-indigo-500/10'
-                  : 'border-white/5 hover:border-indigo-500/30'
+                  ? 'border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-500/20'
+                  : 'border-white/10 hover:border-indigo-500/40'
               }`}
             >
-              <div className="w-12 h-12 mt-2 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                <FiFolder className="text-amber-400 text-xl" />
+              {/* Background decoration */}
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              
+              {/* Folder icon with enhanced styling */}
+              <div className="relative mt-3 mb-2">
+                <div className="w-16 h-16 bg-gradient-to-br from-amber-400/25 to-orange-500/25 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg group-hover:shadow-amber-500/20 group-hover:scale-105 transition-all duration-300">
+                  <FiFolder className="text-amber-400 text-3xl drop-shadow-lg" />
+                </div>
+                {/* Folder tab decoration */}
+                <div className="absolute -top-1 -left-1 w-3 h-3 bg-amber-400/30 rounded-full blur-sm" />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-400/20 rounded-full blur-sm" />
               </div>
-              <div className="flex-1 w-full px-2 py-1 flex items-center justify-center">
-                <span className="text-xs text-slate-300 font-medium text-center line-clamp-2 break-all">
+              
+              {/* Folder name */}
+              <div className="flex-1 w-full px-3 py-2 flex items-center justify-center z-10">
+                <span className="text-xs text-slate-200 font-semibold text-center line-clamp-2 break-all drop-shadow-sm">
                   {folder.originalname || folder.name}
                 </span>
               </div>
+              
+              {/* Context menu button */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setContextMenu({ x: e.clientX, y: e.clientY, item: folder });
                 }}
-                className="absolute top-2 right-2 p-1.5 bg-slate-900/90 backdrop-blur-sm rounded-lg text-slate-400 hover:text-white opacity-0 group-hover:opacity-100 transition-all"
+                className="absolute top-2 right-2 p-2 bg-slate-900/95 backdrop-blur-sm rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:shadow-xl hover:scale-110"
               >
                 <FiMoreVertical className="text-xs" />
               </button>
+              
+              {/* Hover indicator */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 text-[10px] text-indigo-400 font-medium">
+                  <span>Open</span>
+                  <FiChevronRight className="text-xs" />
+                </div>
+              </div>
             </div>
           ))}
 
@@ -1120,12 +1141,22 @@ function FileBrowser() {
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <FiFolder className="text-amber-400 text-lg" />
+                      {/* Enhanced folder icon */}
+                      <div className="relative">
+                        <div className="w-11 h-11 bg-gradient-to-br from-amber-400/25 to-orange-500/25 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-amber-500/20 group-hover:scale-105 transition-all duration-300">
+                          <FiFolder className="text-amber-400 text-xl drop-shadow-lg" />
+                        </div>
+                        {/* Decorative dot */}
+                        <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400/40 rounded-full" />
                       </div>
-                      <span className="text-sm text-slate-300 font-medium truncate max-w-full">
-                        {folder.originalname || folder.name}
-                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm text-slate-200 font-semibold truncate max-w-full">
+                          {folder.originalname || folder.name}
+                        </span>
+                        <span className="text-[10px] text-slate-500 hidden sm:inline">
+                          Folder
+                        </span>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">-</td>
