@@ -43,31 +43,29 @@ if (require('fs').existsSync(clientDist)) {
 
 // Start server
 app.listen(PORT, () => {
+  const uploadPath = path.join(__dirname, 'uploads');
   console.log(`
-╔═══════════════════════════════════════════════════════════╗
-║             ☁️  Cloud Storage Server                      ║
-╠═══════════════════════════════════════════════════════════╣
-║  🚀 Server:  http://localhost:${PORT}                      ║
-║  📁 Uploads: ${path.join(__dirname, 'uploads')}           ║
-║                                                           ║
-║  📡 API Endpoints:                                        ║
-║  ─────────────────────────────────────────────────────    ║
-║  🔐 API Keys:                                             ║
-║  POST   /api/api-keys          - Generate API key         ║
-║  GET    /api/api-keys          - List API keys            ║
-║  GET    /api/api-keys/:id      - Get API key info         ║
-║  POST   /api/api-keys/:id/revoke - Revoke API key         ║
-║  DELETE /api/api-keys/:id      - Delete API key           ║
-║  GET    /api/api-keys/permissions - Get permission levels ║
-║  ─────────────────────────────────────────────────────    ║
-║  📦 Storage:                                              ║
-║  POST   /api/upload          - Upload single file         ║
-║  POST   /api/upload-multiple - Upload multiple files      ║
-║  GET    /api/files           - List files (tenant-scoped) ║
-║  GET    /api/download/:name  - Download file              ║
-║  GET    /api/file/:name      - Get file info              ║
-║  DELETE /api/delete/:name    - Delete file                ║
-║  GET    /api/storage-stats   - Storage usage              ║
-╚═══════════════════════════════════════════════════════════╝
+Cloud Storage Server
+========================================
+Server:   http://localhost:${PORT}
+Uploads:  ${uploadPath}
+
+API Keys:
+  POST   /api/api-keys              - Generate
+  GET    /api/api-keys              - List
+  GET    /api/api-keys/:id          - Get info
+  POST   /api/api-keys/:id/revoke   - Revoke
+  DELETE /api/api-keys/:id          - Delete
+  GET    /api/api-keys/permissions  - Permissions
+
+Storage:
+  POST   /api/upload          - Upload single
+  POST   /api/upload-multiple - Upload multiple
+  GET    /api/files           - List files
+  GET    /api/download/:name  - Download
+  GET    /api/file/:name      - File info
+  DELETE /api/delete/:name    - Delete
+  GET    /api/storage-stats   - Usage stats
+========================================
   `);
 });
