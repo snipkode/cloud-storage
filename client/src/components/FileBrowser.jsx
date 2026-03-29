@@ -576,7 +576,7 @@ function FileBrowser() {
         )
       ) : (
         /* List View */
-        <div className="bg-slate-800/30 border border-white/5 rounded-xl overflow-hidden">
+        <div className="bg-slate-800/30 border border-white/5 rounded-xl overflow-visible">
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-white/5">
@@ -591,7 +591,6 @@ function FileBrowser() {
                 <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-auto">Name</th>
                 <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-24 hidden sm:table-cell">Size</th>
                 <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-32 hidden md:table-cell">Modified</th>
-                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-20">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -601,7 +600,11 @@ function FileBrowser() {
                   key={folder.id || folder.filename}
                   onDoubleClick={() => handleDoubleClick(folder)}
                   onClick={() => handleSelect(folder)}
-                  className={`border-b border-white/5 hover:bg-slate-700/30 cursor-pointer transition-colors ${
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, item: folder });
+                  }}
+                  className={`border-b border-white/5 hover:bg-slate-700/30 cursor-pointer transition-colors group ${
                     selectedFiles.includes(folder) ? 'bg-indigo-500/10' : ''
                   }`}
                 >
@@ -627,18 +630,6 @@ function FileBrowser() {
                   <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
                     {formatRelativeTime(folder.createdAt || folder.modifiedAt)}
                   </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setContextMenu({ x: e.clientX, y: e.clientY, item: folder });
-                      }}
-                      className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all opacity-0 group-hover:opacity-100"
-                      title="More options"
-                    >
-                      <FiMoreVertical className="text-sm" />
-                    </button>
-                  </td>
                 </tr>
               ))}
 
@@ -651,7 +642,11 @@ function FileBrowser() {
                     key={file.id || file.filename}
                     onDoubleClick={() => handleDoubleClick(file)}
                     onClick={() => handleSelect(file)}
-                    className={`border-b border-white/5 hover:bg-slate-700/30 cursor-pointer transition-colors ${
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setContextMenu({ x: e.clientX, y: e.clientY, item: file });
+                    }}
+                    className={`border-b border-white/5 hover:bg-slate-700/30 cursor-pointer transition-colors group ${
                       selectedFiles.includes(file) ? 'bg-indigo-500/10' : ''
                     }`}
                   >
@@ -681,30 +676,6 @@ function FileBrowser() {
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
                       {formatRelativeTime(file.createdAt)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            downloadFile(file.filename);
-                          }}
-                          className="p-2 hover:bg-green-600/20 rounded-lg text-slate-400 hover:text-green-400 transition-all"
-                          title="Download"
-                        >
-                          <FiDownload className="text-sm" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setContextMenu({ x: e.clientX, y: e.clientY, item: file });
-                          }}
-                          className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
-                          title="More options"
-                        >
-                          <FiMoreVertical className="text-sm" />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 );
@@ -745,10 +716,21 @@ function FileBrowser() {
             <span className="text-xs text-slate-500">{formatSize(selectedSize)}</span>
             <div className="h-3 w-px bg-slate-700"></div>
             <button
+              onClick={() => {
+                selectedFiles.forEach(file => {
+                  if (file.type !== 'folder') downloadFile(file.filename);
+                });
+              }}
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors whitespace-nowrap flex items-center gap-1"
+            >
+              <FiDownload className="text-[10px]" />
+              Download
+            </button>
+            <button
               onClick={() => setSelectedFiles([])}
               className="text-xs text-slate-400 hover:text-white transition-colors whitespace-nowrap"
             >
-              Clear selection
+              Clear
             </button>
             <button
               onClick={handleDeleteSelected}
@@ -850,8 +832,11 @@ function FileBrowser() {
       {contextMenu && (
         <div
           ref={contextMenuRef}
-          className="fixed bg-slate-800 border border-white/10 rounded-xl shadow-2xl py-1.5 z-50 min-w-[160px]"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          className="fixed bg-slate-800 border border-white/10 rounded-xl shadow-2xl py-1.5 z-[100] min-w-[160px]"
+          style={{
+            left: Math.min(contextMenu.x, typeof window !== 'undefined' ? window.innerWidth - 180 : contextMenu.x),
+            top: Math.min(contextMenu.y, typeof window !== 'undefined' ? window.innerHeight - 100 : contextMenu.y)
+          }}
         >
           <button
             onClick={() => handleDownload(contextMenu.item)}
