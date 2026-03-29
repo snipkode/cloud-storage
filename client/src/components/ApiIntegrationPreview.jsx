@@ -998,28 +998,28 @@ function ApiIntegrationPreview({ onClose }) {
           </div>
 
           {/* Endpoint List - Compact */}
-          <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex-1 overflow-y-auto p-2">
             {!selectedEndpoint ? (
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 {currentCategory?.endpoints.map((endpoint, idx) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedEndpoint(endpoint)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    className={`w-full text-left p-2.5 rounded-lg border transition-all ${
                       selectedEndpoint === endpoint
                         ? 'bg-purple-500/10 border-purple-500/30'
                         : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded border ${METHOD_COLORS[endpoint.method]}`}>
+                      <span className={`px-1.5 py-0.5 text-[9px] font-mono font-bold rounded border ${METHOD_COLORS[endpoint.method]}`}>
                         {endpoint.method}
                       </span>
-                      <span className="text-xs text-gray-300 font-mono truncate flex-1">
+                      <span className="text-[10px] text-gray-300 font-mono truncate flex-1">
                         {endpoint.path}
                       </span>
                     </div>
-                    <div className="text-[11px] text-gray-400 mt-1">{endpoint.description}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">{endpoint.description}</div>
                   </button>
                 ))}
               </div>
@@ -1032,7 +1032,7 @@ function ApiIntegrationPreview({ onClose }) {
                     onClick={() => setSelectedEndpoint(null)}
                     className="text-gray-400 hover:text-white p-1 hover:bg-white/10 rounded transition-all"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
@@ -1049,20 +1049,20 @@ function ApiIntegrationPreview({ onClose }) {
                 </div>
 
                 {/* Language Selector - Compact */}
-                <div className="flex items-center gap-1 mb-3 pb-3 border-b border-white/10 overflow-x-auto">
+                <div className="flex items-center gap-1 mb-2 pb-2 border-b border-white/10 overflow-x-auto">
                   {Object.entries(LANGUAGES).map(([key, lang]) => {
                     const Icon = lang.icon;
                     return (
                       <button
                         key={key}
                         onClick={() => setSelectedLang(key)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all ${
+                        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-medium whitespace-nowrap transition-all ${
                           selectedLang === key
                             ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
                             : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
-                        <Icon className="text-xs" />
+                        <Icon className="text-[10px]" />
                         <span className="hidden xs:inline">{lang.title}</span>
                       </button>
                     );
@@ -1071,7 +1071,7 @@ function ApiIntegrationPreview({ onClose }) {
 
                 {/* Code Editor - Compact */}
                 <div className="flex-1 overflow-auto bg-[#1e1e2e] rounded-lg border border-white/10 relative">
-                  <pre className="p-3 text-[11px] font-mono leading-5 text-gray-200">
+                  <pre className="p-2.5 text-[10px] font-mono leading-5 text-gray-200">
                     <code>
                       {currentLang?.examples[getExampleKey(selectedEndpoint.name)] || '// No example available'}
                     </code>

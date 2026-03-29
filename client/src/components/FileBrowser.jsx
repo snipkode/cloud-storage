@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   FiGrid, FiList, FiPlus, FiSearch, FiMoreVertical, FiDownload,
-  FiTrash2, FiFolder, FiChevronRight, FiArrowLeft,
-  FiRefreshCw, FiX, FiUpload, FiEdit2, FiCopy, FiScissors, FiCheck
+  FiTrash2, FiFolder, FiX, FiUpload, FiCheck, FiCloud, FiFile,
+  FiImage, FiFilm, FiMusic, FiCode, FiSettings
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useFilesStore } from '@store/filesStore';
@@ -11,20 +11,17 @@ import { useFilesStore } from '@store/filesStore';
  * Get appropriate icon for file type based on mimetype or extension
  */
 const getFileIcon = (mimetype, filename) => {
-  if (mimetype?.includes('image')) return '🖼️';
-  if (mimetype?.includes('video')) return '🎬';
-  if (mimetype?.includes('audio')) return '🎵';
-  if (mimetype?.includes('pdf')) return '📕';
-  if (mimetype?.includes('word') || filename?.endsWith('.doc') || filename?.endsWith('.docx')) return '📘';
-  if (mimetype?.includes('excel') || filename?.endsWith('.xls') || filename?.endsWith('.xlsx')) return '📗';
-  if (mimetype?.includes('powerpoint') || filename?.endsWith('.ppt') || filename?.endsWith('.pptx')) return '📙';
-  if (mimetype?.includes('zip') || mimetype?.includes('compressed')) return '📦';
-  if (mimetype?.includes('text') || filename?.endsWith('.txt')) return '📄';
-  if (filename?.endsWith('.js') || filename?.endsWith('.ts') || filename?.endsWith('.jsx') || filename?.endsWith('.tsx')) return '📜';
-  if (filename?.endsWith('.py')) return '🐍';
-  if (filename?.endsWith('.java')) return '☕';
-  if (filename?.endsWith('.html') || filename?.endsWith('.css')) return '🌐';
-  return '📄';
+  if (mimetype?.includes('image')) return { icon: FiImage, color: 'text-pink-400', bg: 'bg-pink-500/10' };
+  if (mimetype?.includes('video')) return { icon: FiFilm, color: 'text-purple-400', bg: 'bg-purple-500/10' };
+  if (mimetype?.includes('audio')) return { icon: FiMusic, color: 'text-amber-400', bg: 'bg-amber-500/10' };
+  if (mimetype?.includes('pdf')) return { icon: FiFile, color: 'text-red-400', bg: 'bg-red-500/10' };
+  if (filename?.endsWith('.doc') || filename?.endsWith('.docx')) return { icon: FiFile, color: 'text-blue-400', bg: 'bg-blue-500/10' };
+  if (filename?.endsWith('.xls') || filename?.endsWith('.xlsx')) return { icon: FiFile, color: 'text-green-400', bg: 'bg-green-500/10' };
+  if (filename?.endsWith('.ppt') || filename?.endsWith('.pptx')) return { icon: FiFile, color: 'text-orange-400', bg: 'bg-orange-500/10' };
+  if (mimetype?.includes('zip') || mimetype?.includes('compressed')) return { icon: FiFile, color: 'text-amber-400', bg: 'bg-amber-500/10' };
+  if (filename?.endsWith('.js') || filename?.endsWith('.ts') || filename?.endsWith('.jsx') || filename?.endsWith('.tsx')) return { icon: FiCode, color: 'text-yellow-400', bg: 'bg-yellow-500/10' };
+  if (filename?.endsWith('.py')) return { icon: FiCode, color: 'text-cyan-400', bg: 'bg-cyan-500/10' };
+  return { icon: FiFile, color: 'text-slate-400', bg: 'bg-slate-500/10' };
 };
 
 /**
@@ -33,50 +30,59 @@ const getFileIcon = (mimetype, filename) => {
 const formatSize = (bytes) => {
   if (bytes === 0) return '0 B';
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
 /**
- * Format date to locale string
+ * Format date to relative time
  */
-const formatDate = (date) => {
+const formatRelativeTime = (date) => {
   if (!date) return '';
-  return new Date(date).toLocaleDateString('en-US', {
+  const now = new Date();
+  const past = new Date(date);
+  const diffInSeconds = Math.floor((now - past) / 1000);
+
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  
+  return past.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
-    year: 'numeric'
+    year: past.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
   });
 };
 
 function FileBrowser() {
   const { token } = useAuthStore();
   const { files, loading, uploadProgress, error, fetchFiles, uploadMultiple, deleteFile, downloadFile, clearError } = useFilesStore();
-  
+
   // View state
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('fileBrowserView') || 'grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  
+
   // Folder navigation state
   const [currentFolder, setCurrentFolder] = useState(null);
   const [folderHistory, setFolderHistory] = useState([]);
-  
+
   // Selection state
   const [selectedFiles, setSelectedFiles] = useState([]);
-  
+
   // Modal state
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   // Refs
   const contextMenuRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -122,17 +128,17 @@ function FileBrowser() {
         setShowNewFolderModal(false);
         setUploadModalOpen(false);
       }
-      
+
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFiles.length > 0 && !showNewFolderModal && !uploadModalOpen) {
         handleDeleteSelected();
       }
-      
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !showNewFolderModal && !uploadModalOpen) {
         e.preventDefault();
         setSelectedFiles([...filteredFiles]);
       }
     };
-    
+
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedFiles, showNewFolderModal, uploadModalOpen]);
@@ -140,9 +146,9 @@ function FileBrowser() {
   // Filter files based on current folder and search (memoized)
   const filteredFiles = useMemo(() => {
     return files.filter(file => {
-      const matchesSearch = !debouncedSearch || 
+      const matchesSearch = !debouncedSearch ||
         (file.originalname || file.filename).toLowerCase().includes(debouncedSearch.toLowerCase());
-      const matchesFolder = currentFolder 
+      const matchesFolder = currentFolder
         ? file.path?.startsWith(currentFolder.path || '/')
         : (!file.path || file.path === '/');
       return matchesSearch && matchesFolder;
@@ -156,18 +162,6 @@ function FileBrowser() {
       fileList: filteredFiles.filter(f => f.type !== 'folder')
     };
   }, [filteredFiles]);
-
-  // Get breadcrumbs (memoized)
-  const breadcrumbs = useMemo(() => {
-    const crumbs = [{ name: 'My Drive', folder: null }];
-    folderHistory.forEach((f) => {
-      if (f) crumbs.push({ name: f.originalname || f.name, folder: f });
-    });
-    if (currentFolder && !folderHistory.includes(currentFolder)) {
-      crumbs.push({ name: currentFolder.originalname || currentFolder.name, folder: currentFolder });
-    }
-    return crumbs;
-  }, [currentFolder, folderHistory]);
 
   // Calculate selected size (memoized)
   const selectedSize = useMemo(() => {
@@ -192,36 +186,13 @@ function FileBrowser() {
     }
   };
 
-  // Navigate back
-  const handleBack = () => {
-    if (folderHistory.length > 0) {
-      const prevFolder = folderHistory[folderHistory.length - 1];
-      setFolderHistory(prev => prev.slice(0, -1));
-      setCurrentFolder(prevFolder);
-      setSelectedFiles([]);
-    }
-  };
-
-  // Navigate to folder
-  const navigateToFolder = (crumb, idx) => {
-    if (crumb.folder) {
-      setCurrentFolder(crumb.folder);
-      setFolderHistory(folderHistory.slice(0, idx));
-    } else {
-      setCurrentFolder(null);
-      setFolderHistory([]);
-    }
-    setSelectedFiles([]);
-  };
-
   // Create new folder
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
-    
+
     setIsCreatingFolder(true);
     try {
       // TODO: Implement folder creation API
-      // await createFolder(newFolderName.trim(), token);
       setShowNewFolderModal(false);
       setNewFolderName('');
     } catch (err) {
@@ -252,7 +223,7 @@ function FileBrowser() {
   const handleDelete = async (item) => {
     const name = item.originalname || item.filename;
     if (!confirm(`Delete "${name}"? This action cannot be undone.`)) return;
-    
+
     setIsDeleting(true);
     try {
       if (item.type === 'folder') {
@@ -273,7 +244,7 @@ function FileBrowser() {
   const handleDeleteSelected = async () => {
     if (selectedFiles.length === 0) return;
     if (!confirm(`Delete ${selectedFiles.length} selected item(s)? This action cannot be undone.`)) return;
-    
+
     setIsDeleting(true);
     try {
       for (const item of selectedFiles) {
@@ -306,119 +277,111 @@ function FileBrowser() {
     }
   };
 
-  return (
-    <div className="h-full flex flex-col bg-slate-900 rounded-xl border border-white/10 overflow-hidden" role="main" aria-label="File Browser">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-2.5 border-b border-white/10 bg-slate-800/50" role="toolbar" aria-label="File browser toolbar">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {/* Back button */}
-          <button
-            onClick={handleBack}
-            disabled={folderHistory.length === 0}
-            className="p-1.5 rounded-lg hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            aria-label="Go back"
-            title="Go back"
-          >
-            <FiArrowLeft className="text-white text-xs" />
-          </button>
-
-          {/* Breadcrumbs */}
-          <nav className="flex items-center gap-0.5 text-xs overflow-x-auto" aria-label="Breadcrumb">
-            {breadcrumbs.map((crumb, idx, arr) => (
-              <div key={idx} className="flex items-center flex-shrink-0">
-                {idx > 0 && <FiChevronRight className="text-gray-500 text-[10px] mx-0.5 flex-shrink-0" />}
-                <button
-                  onClick={() => navigateToFolder(crumb, idx)}
-                  className={`px-1.5 py-1 rounded-lg whitespace-nowrap transition-all ${
-                    idx === arr.length - 1
-                      ? 'bg-purple-500/20 text-purple-400 font-medium'
-                      : 'text-gray-400 hover:text-white hover:bg-white/10'
-                  }`}
-                  aria-current={idx === arr.length - 1 ? 'page' : undefined}
-                >
-                  {crumb.name}
-                </button>
-              </div>
+  // Loading skeleton
+  if (loading && files.length === 0) {
+    return (
+      <div className="h-full flex flex-col">
+        {/* Toolbar Skeleton */}
+        <div className="flex items-center justify-between p-4 mb-4">
+          <div className="skeleton w-32 h-8 rounded-lg"></div>
+          <div className="flex items-center gap-2">
+            <div className="skeleton w-20 h-9 rounded-lg"></div>
+            <div className="skeleton w-24 h-9 rounded-lg"></div>
+          </div>
+        </div>
+        {/* Grid Skeleton */}
+        <div className="flex-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="aspect-square skeleton rounded-xl"></div>
             ))}
-          </nav>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full">
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3 flex-1">
+          <h1 className="text-white font-semibold text-lg">
+            {currentFolder ? (currentFolder.originalname || currentFolder.name) : 'All Files'}
+          </h1>
+          <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-full">
+            {folders.length + fileList.length} items
+          </span>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Search - hidden on mobile */}
-          <div className="relative hidden sm:block">
-            <FiSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-xs" aria-hidden="true" />
+        <div className="flex items-center gap-2">
+          {/* Search */}
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
             <input
               type="search"
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-40 lg:w-56 bg-slate-800 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-white text-xs placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all"
-              aria-label="Search files"
+              className="w-full sm:w-48 bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
             />
           </div>
 
           {/* View toggle */}
-          <div className="flex bg-slate-800 rounded-lg p-0.5 border border-white/10" role="group" aria-label="View toggle">
+          <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/10">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-all ${
-                viewMode === 'grid' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'
+              className={`p-2 rounded-md transition-all ${
+                viewMode === 'grid' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
               }`}
-              aria-pressed={viewMode === 'grid'}
               aria-label="Grid view"
-              title="Grid view"
             >
-              <FiGrid className="text-xs" />
+              <FiGrid className="text-sm" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-all ${
-                viewMode === 'list' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'
+              className={`p-2 rounded-md transition-all ${
+                viewMode === 'list' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
               }`}
-              aria-pressed={viewMode === 'list'}
               aria-label="List view"
-              title="List view"
             >
-              <FiList className="text-xs" />
+              <FiList className="text-sm" />
             </button>
           </div>
 
-          {/* Upload button */}
+          {/* Upload */}
           <button
             onClick={() => setUploadModalOpen(true)}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all shadow-lg shadow-purple-500/25"
-            aria-label="Upload files"
+            className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
           >
-            <FiUpload className="text-xs" />
+            <FiUpload className="text-sm" />
             <span className="hidden sm:inline">Upload</span>
           </button>
 
-          {/* New folder button */}
+          {/* New Folder */}
           <button
             onClick={() => setShowNewFolderModal(true)}
-            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
-            aria-label="Create new folder"
+            className="flex items-center gap-2 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-sm font-medium transition-all"
           >
-            <FiPlus className="text-xs" />
+            <FiPlus className="text-sm" />
             <span className="hidden sm:inline">New Folder</span>
-            <span className="sm:hidden">Folder</span>
           </button>
         </div>
       </div>
 
       {/* Upload Progress */}
       {(loading || isUploading) && uploadProgress > 0 && (
-        <div className="px-3 py-1.5 border-b border-white/10 bg-slate-800/50" role="status" aria-live="polite">
-          <div className="flex items-center gap-2">
-            <FiUpload className="text-purple-400 text-xs animate-pulse" aria-hidden="true" />
+        <div className="mb-4 p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl" role="status">
+          <div className="flex items-center gap-3">
+            <FiCloud className="text-indigo-400 text-sm animate-pulse" />
             <div className="flex-1">
-              <div className="flex items-center justify-between text-[10px] text-gray-400 mb-0.5">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
                 <span>Uploading...</span>
-                <span>{Math.round(uploadProgress)}%</span>
+                <span className="font-medium text-indigo-400">{Math.round(uploadProgress)}%</span>
               </div>
-              <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-slate-800/50 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all"
+                  className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
@@ -429,323 +392,319 @@ function FileBrowser() {
 
       {/* Error Message */}
       {error && (
-        <div className="px-3 py-1.5 border-b border-white/10 bg-red-500/10 flex items-center justify-between" role="alert">
-          <span className="text-red-400 text-xs">{error}</span>
-          <button onClick={clearError} className="text-red-400 hover:text-white p-0.5" aria-label="Dismiss error">
-            <FiX className="text-xs" />
+        <div className="mb-4 p-3 bg-red-500/5 border border-red-500/20 rounded-xl flex items-center justify-between" role="alert">
+          <div className="flex items-center gap-2">
+            <FiX className="text-red-400 text-sm" />
+            <span className="text-red-400 text-sm">{error}</span>
+          </div>
+          <button onClick={clearError} className="text-red-400 hover:text-white p-1.5 rounded-lg hover:bg-red-500/10 transition-all">
+            <FiX className="text-sm" />
           </button>
         </div>
       )}
 
       {/* File Grid/List */}
-      <div className="flex-1 overflow-auto p-2.5" role="region" aria-label="File list">
-        {viewMode === 'grid' ? (
-          /* Grid View */
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
-            {/* Parent folder shortcut */}
-            {folderHistory.length > 0 && (
-              <button
-                onClick={handleBack}
-                className="group aspect-square bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/30 rounded-lg flex flex-col items-center justify-center gap-1.5 transition-all"
-                aria-label="Parent folder"
-              >
-                <div className="text-3xl">📁</div>
-                <span className="text-[10px] text-gray-400 font-medium">..</span>
-              </button>
-            )}
-
-            {/* Folders */}
-            {folders.map((folder) => (
-              <div
-                key={folder.id || folder.filename}
-                onDoubleClick={() => handleDoubleClick(folder)}
-                onClick={(e) => handleSelect(folder, e.ctrlKey || e.metaKey)}
-                className={`group aspect-square bg-white/5 hover:bg-white/10 border rounded-lg flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer relative ${
-                  selectedFiles.includes(folder)
-                    ? 'border-purple-500 bg-purple-500/20'
-                    : 'border-white/10 hover:border-purple-500/30'
-                }`}
-                role="button"
-                tabIndex={0}
-                aria-label={`Folder: ${folder.originalname || folder.name}`}
-              >
-                <div className="text-4xl">📁</div>
-                <span className="text-[10px] text-gray-300 font-medium text-center line-clamp-2 px-1.5">
-                  {folder.originalname || folder.name}
-                </span>
-                <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setContextMenu({ x: e.clientX, y: e.clientY, item: folder });
-                    }}
-                    className="p-1 bg-slate-800 hover:bg-slate-700 rounded-md text-gray-400 hover:text-white"
-                    aria-label="More options"
-                  >
-                    <FiMoreVertical className="text-[10px]" />
-                  </button>
-                </div>
+      {viewMode === 'grid' ? (
+        filteredFiles.length === 0 ? (
+          /* Grid Empty State - Compact */
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center py-8">
+              <div className="w-12 h-12 mx-auto mb-3 bg-slate-800/50 rounded-xl flex items-center justify-center">
+                <FiCloud className="text-2xl text-slate-600" />
               </div>
-            ))}
+              <p className="text-slate-400 text-xs mb-2">
+                {debouncedSearch ? 'No files match your search' : 'This folder is empty'}
+              </p>
+              {!debouncedSearch && (
+                <button
+                  onClick={() => setUploadModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors"
+                >
+                  <FiUpload className="text-xs" />
+                  Upload file
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Grid View */
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
+          {/* Folders */}
+          {folders.map((folder) => (
+            <div
+              key={folder.id || folder.filename}
+              onDoubleClick={() => handleDoubleClick(folder)}
+              onClick={(e) => handleSelect(folder, e.ctrlKey || e.metaKey)}
+              className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
+                selectedFiles.includes(folder)
+                  ? 'border-indigo-500 bg-indigo-500/10'
+                  : 'border-white/5 hover:border-indigo-500/30'
+              }`}
+            >
+              <div className="w-14 h-14 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-xl flex items-center justify-center">
+                <FiFolder className="text-amber-400 text-2xl" />
+              </div>
+              <span className="text-xs text-slate-300 font-medium text-center line-clamp-2 px-2">
+                {folder.originalname || folder.name}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setContextMenu({ x: e.clientX, y: e.clientY, item: folder });
+                }}
+                className="absolute top-2 right-2 p-1.5 bg-slate-900/90 backdrop-blur-sm rounded-lg text-slate-400 hover:text-white opacity-0 group-hover:opacity-100 transition-all"
+              >
+                <FiMoreVertical className="text-xs" />
+              </button>
+            </div>
+          ))}
 
-            {/* Files */}
-            {fileList.map((file) => (
+          {/* Files */}
+          {fileList.map((file) => {
+            const fileIcon = getFileIcon(file.mimetype, file.filename);
+            const IconComponent = fileIcon.icon;
+            return (
               <div
                 key={file.id || file.filename}
                 onDoubleClick={() => handleDoubleClick(file)}
                 onClick={(e) => handleSelect(file, e.ctrlKey || e.metaKey)}
-                className={`group aspect-square bg-white/5 hover:bg-white/10 border rounded-lg flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer relative ${
+                className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
                   selectedFiles.includes(file)
-                    ? 'border-purple-500 bg-purple-500/20'
-                    : 'border-white/10 hover:border-purple-500/30'
+                    ? 'border-indigo-500 bg-indigo-500/10'
+                    : 'border-white/5 hover:border-indigo-500/30'
                 }`}
-                role="button"
-                tabIndex={0}
-                aria-label={`File: ${file.originalname || file.filename}`}
               >
-                <div className="text-4xl">{getFileIcon(file.mimetype, file.filename)}</div>
-                <span className="text-[10px] text-gray-300 font-medium text-center line-clamp-2 px-1.5">
+                <div className={`w-14 h-14 ${fileIcon.bg} rounded-xl flex items-center justify-center`}>
+                  <IconComponent className={`${fileIcon.color} text-2xl`} />
+                </div>
+                <span className="text-xs text-slate-300 font-medium text-center line-clamp-2 px-2">
                   {file.originalname || file.filename}
                 </span>
-                <span className="text-[10px] text-gray-500">{formatSize(file.size)}</span>
-                <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
+                <span className="text-[10px] text-slate-500">{formatSize(file.size)}</span>
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       downloadFile(file.filename);
                     }}
-                    className="p-1 bg-slate-800 hover:bg-green-600 rounded-md text-gray-400 hover:text-white transition-colors"
-                    aria-label="Download"
+                    className="p-1.5 bg-slate-900/90 backdrop-blur-sm rounded-lg text-slate-400 hover:text-green-400 transition-all"
                   >
-                    <FiDownload className="text-[10px]" />
+                    <FiDownload className="text-xs" />
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setContextMenu({ x: e.clientX, y: e.clientY, item: file });
                     }}
-                    className="p-1 bg-slate-800 hover:bg-slate-700 rounded-md text-gray-400 hover:text-white"
-                    aria-label="More options"
+                    className="p-1.5 bg-slate-900/90 backdrop-blur-sm rounded-lg text-slate-400 hover:text-white transition-all"
                   >
-                    <FiMoreVertical className="text-[10px]" />
+                    <FiMoreVertical className="text-xs" />
                   </button>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
-        ) : (
-          /* List View */
-          <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
-            <table className="w-full" role="table">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left text-[10px] text-gray-400 font-medium px-2.5 py-2 w-8">
+        )
+      ) : (
+        /* List View */
+        <div className="bg-slate-800/30 border border-white/5 rounded-xl overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/5">
+                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedFiles.length === filteredFiles.length && filteredFiles.length > 0}
+                    onChange={toggleSelectAll}
+                    className="rounded border-slate-600 bg-slate-700/50 text-indigo-500 focus:ring-indigo-500/50 w-4 h-4"
+                  />
+                </th>
+                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3">Name</th>
+                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 hidden sm:table-cell">Size</th>
+                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 hidden md:table-cell">Modified</th>
+                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-20">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Folders */}
+              {folders.map((folder) => (
+                <tr
+                  key={folder.id || folder.filename}
+                  onDoubleClick={() => handleDoubleClick(folder)}
+                  onClick={() => handleSelect(folder)}
+                  className={`border-b border-white/5 hover:bg-slate-700/30 cursor-pointer transition-colors ${
+                    selectedFiles.includes(folder) ? 'bg-indigo-500/10' : ''
+                  }`}
+                >
+                  <td className="px-4 py-3">
                     <input
                       type="checkbox"
-                      checked={selectedFiles.length === filteredFiles.length && filteredFiles.length > 0}
-                      onChange={toggleSelectAll}
-                      className="rounded border-white/20 bg-white/10 text-purple-500 focus:ring-purple-500/50 w-3.5 h-3.5"
-                      aria-label="Select all"
+                      checked={selectedFiles.includes(folder)}
+                      onChange={(e) => e.stopPropagation()}
+                      className="rounded border-slate-600 bg-slate-700/50 text-indigo-500 focus:ring-indigo-500/50 w-4 h-4"
                     />
-                  </th>
-                  <th className="text-left text-[10px] text-gray-400 font-medium px-2.5 py-2" scope="col">Name</th>
-                  <th className="text-left text-[10px] text-gray-400 font-medium px-2.5 py-2 hidden sm:table-cell" scope="col">Size</th>
-                  <th className="text-left text-[10px] text-gray-400 font-medium px-2.5 py-2 hidden md:table-cell" scope="col">Modified</th>
-                  <th className="text-left text-[10px] text-gray-400 font-medium px-2.5 py-2 w-16" scope="col">Actions</th>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-lg flex items-center justify-center">
+                        <FiFolder className="text-amber-400 text-lg" />
+                      </div>
+                      <span className="text-sm text-slate-300 font-medium truncate max-w-xs">
+                        {folder.originalname || folder.name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">-</td>
+                  <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
+                    {formatRelativeTime(folder.createdAt || folder.modifiedAt)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setContextMenu({ x: e.clientX, y: e.clientY, item: folder });
+                      }}
+                      className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
+                    >
+                      <FiMoreVertical className="text-sm" />
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {/* Parent folder row */}
-                {folderHistory.length > 0 && (
-                  <tr
-                    onClick={handleBack}
-                    className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
-                  >
-                    <td className="px-2.5 py-2"></td>
-                    <td className="px-2.5 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">📁</span>
-                        <span className="text-xs text-gray-300 font-medium">..</span>
-                      </div>
-                    </td>
-                    <td className="px-2.5 py-2 text-xs text-gray-500 hidden sm:table-cell">-</td>
-                    <td className="px-2.5 py-2 text-xs text-gray-500 hidden md:table-cell">-</td>
-                    <td className="px-2.5 py-2"></td>
-                  </tr>
-                )}
+              ))}
 
-                {/* Folders */}
-                {folders.map((folder) => (
-                  <tr
-                    key={folder.id || folder.filename}
-                    onDoubleClick={() => handleDoubleClick(folder)}
-                    onClick={() => handleSelect(folder)}
-                    className={`border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors ${
-                      selectedFiles.includes(folder) ? 'bg-purple-500/20' : ''
-                    }`}
-                  >
-                    <td className="px-2.5 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedFiles.includes(folder)}
-                        onChange={(e) => e.stopPropagation()}
-                        className="rounded border-white/20 bg-white/10 text-purple-500 focus:ring-purple-500/50 w-3.5 h-3.5"
-                        aria-label={`Select ${folder.originalname || folder.name}`}
-                      />
-                    </td>
-                    <td className="px-2.5 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">📁</span>
-                        <span className="text-xs text-gray-300 font-medium truncate max-w-[160px] sm:max-w-xs">
-                          {folder.originalname || folder.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-2.5 py-2 text-xs text-gray-500 hidden sm:table-cell">-</td>
-                    <td className="px-2.5 py-2 text-xs text-gray-500 hidden md:table-cell">
-                      {formatDate(folder.createdAt || folder.modifiedAt)}
-                    </td>
-                    <td className="px-2.5 py-2">
-                      <div className="flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setContextMenu({ x: e.clientX, y: e.clientY, item: folder });
-                          }}
-                          className="p-1 hover:bg-white/10 rounded-md text-gray-400 hover:text-white transition-colors"
-                          aria-label="More options"
-                        >
-                          <FiMoreVertical className="text-[10px]" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-
-                {/* Files */}
-                {fileList.map((file) => (
+              {/* Files */}
+              {fileList.map((file) => {
+                const fileIcon = getFileIcon(file.mimetype, file.filename);
+                const IconComponent = fileIcon.icon;
+                return (
                   <tr
                     key={file.id || file.filename}
                     onDoubleClick={() => handleDoubleClick(file)}
                     onClick={() => handleSelect(file)}
-                    className={`border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors ${
-                      selectedFiles.includes(file) ? 'bg-purple-500/20' : ''
+                    className={`border-b border-white/5 hover:bg-slate-700/30 cursor-pointer transition-colors ${
+                      selectedFiles.includes(file) ? 'bg-indigo-500/10' : ''
                     }`}
                   >
-                    <td className="px-2.5 py-2">
+                    <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={selectedFiles.includes(file)}
                         onChange={(e) => e.stopPropagation()}
-                        className="rounded border-white/20 bg-white/10 text-purple-500 focus:ring-purple-500/50 w-3.5 h-3.5"
-                        aria-label={`Select ${file.originalname || file.filename}`}
+                        className="rounded border-slate-600 bg-slate-700/50 text-indigo-500 focus:ring-indigo-500/50 w-4 h-4"
                       />
                     </td>
-                    <td className="px-2.5 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{getFileIcon(file.mimetype, file.filename)}</span>
-                        <span className="text-xs text-gray-300 font-medium truncate max-w-[160px] sm:max-w-xs">
-                          {file.originalname || file.filename}
-                        </span>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 ${fileIcon.bg} rounded-lg flex items-center justify-center`}>
+                          <IconComponent className={`${fileIcon.color} text-lg`} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm text-slate-300 font-medium truncate max-w-xs">
+                            {file.originalname || file.filename}
+                          </div>
+                          <div className="text-xs text-slate-500 sm:hidden">{formatSize(file.size)}</div>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-2.5 py-2 text-xs text-gray-500 hidden sm:table-cell">
+                    <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">
                       {formatSize(file.size)}
                     </td>
-                    <td className="px-2.5 py-2 text-xs text-gray-500 hidden md:table-cell">
-                      {formatDate(file.createdAt)}
+                    <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
+                      {formatRelativeTime(file.createdAt)}
                     </td>
-                    <td className="px-2.5 py-2">
-                      <div className="flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             downloadFile(file.filename);
                           }}
-                          className="p-1 hover:bg-green-600/20 rounded-md text-gray-400 hover:text-green-400 transition-colors"
-                          aria-label="Download"
+                          className="p-2 hover:bg-green-600/20 rounded-lg text-slate-400 hover:text-green-400 transition-all"
                         >
-                          <FiDownload className="text-[10px]" />
+                          <FiDownload className="text-sm" />
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setContextMenu({ x: e.clientX, y: e.clientY, item: file });
                           }}
-                          className="p-1 hover:bg-white/10 rounded-md text-gray-400 hover:text-white transition-colors"
-                          aria-label="More options"
+                          className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
                         >
-                          <FiMoreVertical className="text-[10px]" />
+                          <FiMoreVertical className="text-sm" />
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                );
+              })}
+            </tbody>
+          </table>
 
-            {/* Empty state */}
-            {filteredFiles.length === 0 && (
-              <div className="p-8 text-center">
-                <div className="text-5xl mb-3" aria-hidden="true">📂</div>
-                <p className="text-gray-400 text-xs mb-3">
-                  {debouncedSearch ? 'No files match your search' : 'This folder is empty'}
-                </p>
-                {!debouncedSearch && (
-                  <button
-                    onClick={() => setUploadModalOpen(true)}
-                    className="text-purple-400 hover:text-purple-300 text-xs font-medium inline-flex items-center gap-1.5"
-                  >
-                    <FiUpload className="text-[10px]" />
-                    Upload your first file
-                  </button>
-                )}
+          {/* Empty state - Compact */}
+          {filteredFiles.length === 0 && (
+            <div className="p-8 text-center">
+              <div className="w-12 h-12 mx-auto mb-3 bg-slate-800/50 rounded-xl flex items-center justify-center">
+                <FiCloud className="text-2xl text-slate-600" />
               </div>
-            )}
-          </div>
-        )}
-      </div>
+              <p className="text-slate-400 text-xs mb-2">
+                {debouncedSearch ? 'No files match your search' : 'This folder is empty'}
+              </p>
+              {!debouncedSearch && (
+                <button
+                  onClick={() => setUploadModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors"
+                >
+                  <FiUpload className="text-xs" />
+                  Upload file
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Status Bar */}
-      <div className="px-3 py-1.5 border-t border-white/10 bg-slate-800/50 flex items-center justify-between text-[10px] text-gray-400" role="status">
-        <span>
-          {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
-          {selectedFiles.length > 0 && ` • ${selectedFiles.length} selected`}
-        </span>
-        {selectedFiles.length > 0 && (
-          <div className="flex items-center gap-3">
-            <span>{formatSize(selectedSize)}</span>
+      {/* Status Bar - Compact */}
+      {selectedFiles.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
+          <div className="bg-slate-900/95 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-2.5 flex items-center gap-3 shadow-2xl whitespace-nowrap">
+            <span className="text-xs text-slate-300 font-medium">
+              {selectedFiles.length} selected
+            </span>
+            <span className="text-xs text-slate-500">{formatSize(selectedSize)}</span>
+            <div className="h-3 w-px bg-slate-700"></div>
             <button
               onClick={() => setSelectedFiles([])}
-              className="hover:text-white transition-colors"
+              className="text-xs text-slate-400 hover:text-white transition-colors whitespace-nowrap"
             >
               Clear selection
             </button>
             <button
               onClick={handleDeleteSelected}
               disabled={isDeleting}
-              className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+              className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 flex items-center gap-1 whitespace-nowrap"
             >
+              <FiTrash2 className="text-[10px]" />
               Delete
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Upload Modal */}
       {uploadModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
-          <div className="bg-slate-900 rounded-xl border border-white/10 max-w-sm w-full">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <h3 id="upload-modal-title" className="text-white font-semibold text-sm">Upload Files</h3>
-              <button onClick={() => setUploadModalOpen(false)} className="text-gray-400 hover:text-white p-1" aria-label="Close upload modal">
-                <FiX className="text-base" />
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 rounded-2xl border border-white/10 max-w-md w-full">
+            <div className="p-5 border-b border-white/5 flex items-center justify-between">
+              <h3 className="text-white font-semibold">Upload Files</h3>
+              <button onClick={() => setUploadModalOpen(false)} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-all">
+                <FiX className="text-lg" />
               </button>
             </div>
-            <div className="p-4">
+            <div className="p-5">
               <label className="block cursor-pointer">
                 <div
-                  className="border-2 border-dashed border-white/20 hover:border-purple-500/50 rounded-lg p-6 text-center transition-colors"
+                  className="border-2 border-dashed border-slate-700 hover:border-indigo-500/50 rounded-xl p-8 text-center transition-all hover:bg-slate-800/30"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -756,10 +715,11 @@ function FileBrowser() {
                     }
                   }}
                 >
-                  <FiUpload className="text-3xl text-gray-400 mx-auto mb-2" aria-hidden="true" />
-                  <p className="text-white font-medium text-sm">Click to select files</p>
-                  <p className="text-xs text-gray-500 mt-0.5">or drag and drop here</p>
-                  <p className="text-xs text-gray-600 mt-1">Max 50MB per file</p>
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center">
+                    <FiUpload className="text-3xl text-indigo-400" />
+                  </div>
+                  <p className="text-white font-medium mb-1">Click to select files</p>
+                  <p className="text-xs text-slate-500">or drag and drop here</p>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -768,7 +728,6 @@ function FileBrowser() {
                   onChange={handleFileInputChange}
                   className="hidden"
                   accept="*/*"
-                  aria-label="Select files to upload"
                 />
               </label>
             </div>
@@ -778,42 +737,37 @@ function FileBrowser() {
 
       {/* New Folder Modal */}
       {showNewFolderModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="folder-modal-title">
-          <div className="bg-slate-900 rounded-xl border border-white/10 max-w-sm w-full">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <h3 id="folder-modal-title" className="text-white font-semibold text-sm">New Folder</h3>
-              <button onClick={() => setShowNewFolderModal(false)} className="text-gray-400 hover:text-white p-1" aria-label="Close new folder modal">
-                <FiX className="text-base" />
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 rounded-2xl border border-white/10 max-w-sm w-full">
+            <div className="p-5 border-b border-white/5 flex items-center justify-between">
+              <h3 className="text-white font-semibold">New Folder</h3>
+              <button onClick={() => setShowNewFolderModal(false)} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-all">
+                <FiX className="text-lg" />
               </button>
             </div>
-            <div className="p-4 space-y-3">
-              <div>
-                <label htmlFor="folder-name" className="block text-xs text-gray-400 mb-1.5">Folder Name</label>
-                <input
-                  id="folder-name"
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="Enter folder name"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50"
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
-                />
-              </div>
+            <div className="p-5">
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Folder name"
+                className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+              />
             </div>
-            <div className="p-4 border-t border-white/10 flex justify-end gap-2">
+            <div className="p-5 border-t border-white/5 flex justify-end gap-2">
               <button
                 onClick={() => setShowNewFolderModal(false)}
-                className="px-3 py-1.5 text-gray-400 hover:text-white text-xs"
+                className="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium rounded-lg hover:bg-white/5 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim() || isCreatingFolder}
-                className="bg-purple-500 hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-xl text-sm font-medium transition-all"
               >
-                {isCreatingFolder && <FiCheck className="text-[10px] animate-spin" />}
                 Create
               </button>
             </div>
@@ -825,51 +779,23 @@ function FileBrowser() {
       {contextMenu && (
         <div
           ref={contextMenuRef}
-          className="fixed bg-slate-800 border border-white/10 rounded-lg shadow-xl py-1 z-50 min-w-[160px]"
+          className="fixed bg-slate-800 border border-white/10 rounded-xl shadow-2xl py-1.5 z-50 min-w-[160px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
-          role="menu"
-          aria-label="File actions"
         >
           <button
             onClick={() => handleDownload(contextMenu.item)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
-            role="menuitem"
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-all"
           >
-            <FiDownload className="text-[10px]" aria-hidden="true" />
+            <FiDownload className="text-sm" />
             Download
           </button>
-          <button
-            onClick={() => setContextMenu(null)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
-            role="menuitem"
-          >
-            <FiEdit2 className="text-[10px]" aria-hidden="true" />
-            Rename
-          </button>
-          <button
-            onClick={() => setContextMenu(null)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
-            role="menuitem"
-          >
-            <FiCopy className="text-[10px]" aria-hidden="true" />
-            Copy
-          </button>
-          <button
-            onClick={() => setContextMenu(null)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
-            role="menuitem"
-          >
-            <FiScissors className="text-[10px]" aria-hidden="true" />
-            Move to
-          </button>
-          <div className="border-t border-white/10 my-1" role="separator"></div>
+          <div className="border-t border-white/5 my-1"></div>
           <button
             onClick={() => handleDelete(contextMenu.item)}
             disabled={isDeleting}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors disabled:opacity-50"
-            role="menuitem"
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all disabled:opacity-50"
           >
-            <FiTrash2 className="text-[10px]" aria-hidden="true" />
+            <FiTrash2 className="text-sm" />
             {isDeleting ? 'Deleting...' : 'Delete'}
           </button>
         </div>

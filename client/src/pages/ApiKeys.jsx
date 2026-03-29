@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
 import {
   FiKey, FiPlus, FiTrash2, FiLock, FiCopy, FiCheck,
-  FiX, FiActivity, FiCode, FiChevronRight, FiSearch,
-  FiXCircle, FiBook
+  FiX, FiActivity, FiCode, FiSearch, FiXCircle,
+  FiBook, FiShield, FiClock, FiServer
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import ApiIntegrationPreview from '@components/ApiIntegrationPreview';
 
 const PERMISSION_LEVELS = [
-  { id: 'read_only', name: 'Read Only', description: 'List & download files', permissions: ['read'], color: 'blue' },
-  { id: 'upload_only', name: 'Upload Only', description: 'Upload files only', permissions: ['upload'], color: 'green' },
-  { id: 'read_write', name: 'Read & Write', description: 'Full file access', permissions: ['read', 'upload', 'delete'], color: 'purple' },
-  { id: 'admin', name: 'Admin', description: 'Unrestricted access', permissions: ['admin'], color: 'red' }
+  { id: 'read_only', name: 'Read Only', description: 'List & download files only', permissions: ['read'], color: 'blue', icon: '📖' },
+  { id: 'upload_only', name: 'Upload Only', description: 'Upload files only', permissions: ['upload'], color: 'green', icon: '📤' },
+  { id: 'read_write', name: 'Read & Write', description: 'Full file management access', permissions: ['read', 'upload', 'delete'], color: 'purple', icon: '✏️' },
+  { id: 'admin', name: 'Admin', description: 'Unrestricted access to all resources', permissions: ['admin'], color: 'red', icon: '👑' }
 ];
 
 const CODE_EXAMPLES = {
@@ -143,7 +143,14 @@ function ApiKeys() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      if (res.ok) setApiKeys(data.apiKeys);
+      if (res.ok) {
+        // Map API keys to ensure key property exists
+        const mappedKeys = (data.apiKeys || []).map(key => ({
+          ...key,
+          key: key.key || key.apiKey || key.id || ''
+        }));
+        setApiKeys(mappedKeys);
+      }
       else setError(data.error);
     } catch {
       setError('Failed to load API keys');
@@ -185,7 +192,12 @@ function ApiKeys() {
 
       const data = await res.json();
       if (res.ok) {
-        setNewKey(data.apiKey);
+        // Ensure the key property exists with the actual API key value
+        const newApiKey = {
+          ...data.apiKey,
+          key: data.apiKey.key || data.apiKey.apiKey || data.key || ''
+        };
+        setNewKey(newApiKey);
         setShowKeyModal(true);
         setKeyName('');
         setSelectedPermissions(['read']);
@@ -202,7 +214,7 @@ function ApiKeys() {
   };
 
   const handleRevoke = async (id) => {
-    if (!confirm('Revoke this API key?')) return;
+    if (!confirm('Revoke this API key? This action will immediately disable the key.')) return;
     try {
       const res = await fetch(`/api/api-keys/${id}/revoke`, {
         method: 'POST',
@@ -221,7 +233,7 @@ function ApiKeys() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this API key permanently?')) return;
+    if (!confirm('Delete this API key permanently? This action cannot be undone.')) return;
     try {
       const res = await fetch(`/api/api-keys/${id}`, {
         method: 'DELETE',
@@ -259,233 +271,273 @@ function ApiKeys() {
     revoked: apiKeys.filter(k => !k.active).length
   };
 
-  const getPermissionStyle = (perm) => {
+  const getPermissionColor = (perm) => {
     const colors = {
-      read: 'bg-blue-500/10 text-blue-400',
-      upload: 'bg-green-500/10 text-green-400',
-      delete: 'bg-orange-500/10 text-orange-400',
-      admin: 'bg-red-500/10 text-red-400'
+      read: 'from-blue-500 to-cyan-500',
+      upload: 'from-green-500 to-emerald-500',
+      delete: 'from-orange-500 to-red-500',
+      admin: 'from-red-500 to-rose-500'
     };
     return colors[perm] || colors.read;
   };
 
+  const getPermissionBadgeClass = (perm) => {
+    const classes = {
+      read: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+      upload: 'bg-green-500/10 text-green-400 border-green-500/20',
+      delete: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+      admin: 'bg-red-500/10 text-red-400 border-red-500/20'
+    };
+    return classes[perm] || classes.read;
+  };
+
   return (
     <div className="space-y-4">
-      {/* Header - Compact */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      {/* Action Bar */}
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
-            <FiKey className="text-white text-lg" />
-          </div>
-          <div>
-            <h2 className="text-white font-semibold text-base">API Keys</h2>
-            <p className="text-xs text-gray-400">Manage application access</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+          <h1 className="text-white font-semibold text-lg">API Keys</h1>
           <button
             onClick={() => setShowIntegrationPreview(true)}
-            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all"
+            className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-all"
           >
-            <FiBook className="text-purple-400 text-sm" />
-            <span className="hidden sm:inline">API Docs</span>
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-purple-500/25"
-          >
-            <FiPlus className="text-sm" />
-            <span>New Key</span>
+            <FiBook className="text-indigo-400" />
+            <span>API Docs</span>
           </button>
         </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
+        >
+          <FiPlus className="text-sm" />
+          <span>New Key</span>
+        </button>
       </div>
 
       {/* Messages */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center justify-between">
-          <span className="text-red-400 text-sm">{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-white p-1">
-            <FiX className="text-base" />
+        <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-3 flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <FiX className="text-red-400 text-xs" />
+            </div>
+            <span className="text-red-400 text-sm">{error}</span>
+          </div>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-white p-1 rounded-lg hover:bg-red-500/10 transition-all">
+            <FiX className="text-sm" />
           </button>
         </div>
       )}
 
       {success && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 flex items-center gap-2">
-          <FiCheck className="text-green-400" />
-          <span className="text-green-400 text-sm">{success}</span>
+        <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-3 flex items-center gap-2 mb-4">
+          <div className="w-6 h-6 bg-green-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+            <FiCheck className="text-green-400 text-xs" />
+          </div>
+          <span className="text-green-400 text-sm font-medium">{success}</span>
         </div>
       )}
 
-      {/* Unified Filter Tabs with Stats */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        {/* iOS-style Segmented Control with Stats */}
-        <div className="flex bg-slate-800/80 rounded-xl p-1 border border-white/10 w-full sm:w-auto">
+      {/* Compact Filter Bar */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/5">
           {[
-            { id: 'all', label: 'All', count: stats.total, icon: '📁' },
-            { id: 'active', label: 'Active', count: stats.active, icon: '🟢' },
-            { id: 'revoked', label: 'Revoked', count: stats.revoked, icon: '🔴' }
+            { id: 'all', label: 'All', count: stats.total },
+            { id: 'active', label: 'Active', count: stats.active },
+            { id: 'revoked', label: 'Revoked', count: stats.revoked }
           ].map((f) => (
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
                 filter === f.id
-                  ? 'bg-white text-slate-900 shadow-md'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-white text-slate-900 shadow'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              <span className="text-xs">{f.icon}</span>
               <span>{f.label}</span>
-              <span className={`text-xs px-1.5 py-0.5 rounded-md ${
-                filter === f.id ? 'bg-slate-200 text-slate-700' : 'bg-slate-700/50'
+              <span className={`px-1.5 py-0.5 text-[10px] rounded-full ${
+                filter === f.id ? 'bg-slate-200 text-slate-700' : 'bg-slate-700/50 text-slate-500'
               }`}>
                 {f.count}
               </span>
             </button>
           ))}
         </div>
-
-        {/* Search Input */}
-        <div className="relative w-full sm:w-64">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm" />
+        <div className="relative flex-1 max-w-xs">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
           <input
             type="text"
-            placeholder="Search keys..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-800/80 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all"
+            className="w-full bg-slate-800/50 border border-white/10 rounded-lg pl-9 pr-8 py-1.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-all"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white p-0.5"
             >
-              <FiXCircle className="text-sm" />
+              <FiXCircle className="text-xs" />
             </button>
           )}
         </div>
       </div>
 
       {/* API Keys List */}
-      <div className="grid gap-2">
+      <div className="grid gap-3">
         {loading ? (
-          <div className="p-8 text-center text-gray-400 text-sm">Loading...</div>
+          // Loading skeletons
+          <>
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="card p-4">
+                <div className="flex items-center gap-4">
+                  <div className="skeleton w-12 h-12 rounded-xl"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="skeleton w-32 h-5 rounded"></div>
+                    <div className="skeleton w-48 h-4 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>
         ) : filteredKeys.length === 0 ? (
-          <div className="p-8 text-center">
-            <div className="text-3xl mb-2">🔑</div>
-            <p className="text-gray-400 text-xs">
-              {searchQuery ? 'No matching API keys' : 'No API keys yet'}
+          // Empty state
+          <div className="card p-12 text-center">
+            <div className="w-20 h-20 mx-auto mb-4 bg-slate-800/50 rounded-2xl flex items-center justify-center">
+              <FiKey className="text-4xl text-slate-600" />
+            </div>
+            <h3 className="text-white font-semibold mb-2">No API keys yet</h3>
+            <p className="text-slate-500 text-sm mb-4">
+              {searchQuery ? 'No matching API keys found' : 'Create your first API key to get started'}
             </p>
+            {!searchQuery && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
+              >
+                <FiPlus className="text-base" />
+                Create API Key
+              </button>
+            )}
           </div>
         ) : (
+          // Keys list
           filteredKeys.map((key) => (
             <div
               key={key.id}
-              className="group bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/10 hover:border-purple-500/30 transition-all"
+              className="card p-3 hover:border-indigo-500/30 transition-all group"
             >
-              <div className="p-3">
-                <div className="flex items-center gap-3">
-                  {/* Icon */}
-                  <button
-                    onClick={() => {
-                      setSelectedKey(key);
-                      setCodeLang('curl');
-                      setExampleIdx(0);
-                      setShowCodeModal(true);
-                    }}
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
-                      key.active ? 'bg-gradient-to-br from-purple-500/20 to-purple-600/10' : 'bg-gray-500/10'
-                    } ${key.active ? 'hover:from-purple-500/30 hover:to-purple-600/20' : ''}`}
-                  >
-                    <FiKey className={key.active ? 'text-purple-400 text-sm' : 'text-gray-500 text-sm'} />
-                  </button>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0" onClick={() => {
+              <div className="flex items-center gap-3">
+                {/* Icon */}
+                <button
+                  onClick={() => {
                     setSelectedKey(key);
                     setCodeLang('curl');
                     setExampleIdx(0);
                     setShowCodeModal(true);
-                  }}>
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-white font-medium text-sm truncate">{key.name}</span>
-                      <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium ${
-                        key.active
-                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                      }`}>
-                        {key.active ? 'Active' : 'Revoked'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500 flex-wrap">
-                      <span className="font-mono bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
-                        {key.id.slice(0, 8)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <FiActivity className="text-[10px]" />
-                        {key.usageCount}
-                      </span>
-                      {key.lastUsedAt && (
-                        <span>• {new Date(key.lastUsedAt).toLocaleDateString()}</span>
-                      )}
-                    </div>
-                  </div>
+                  }}
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+                    key.active
+                      ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30'
+                      : 'bg-slate-800/50 border border-slate-700/50'
+                  }`}
+                >
+                  <FiKey className={key.active ? 'text-indigo-400 text-sm' : 'text-slate-600 text-sm'} />
+                </button>
 
-                  {/* Permissions - Mobile friendly */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {key.permissions.slice(0, 3).map((perm) => (
-                      <span
-                        key={perm}
-                        className={`px-1.5 py-1 text-[10px] rounded-md font-medium ${getPermissionStyle(perm)}`}
-                        title={perm}
-                      >
-                        {perm.charAt(0).toUpperCase()}
-                      </span>
-                    ))}
-                    {key.permissions.length > 3 && (
-                      <span className="text-[10px] text-gray-500">+{key.permissions.length - 3}</span>
+                {/* Info */}
+                <div
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={() => {
+                    // Pass the actual API key value
+                    const keyValue = key.key || key.apiKey || key.id || '';
+                    setSelectedKey({ ...key, key: keyValue });
+                    setCodeLang('curl');
+                    setExampleIdx(0);
+                    setShowCodeModal(true);
+                  }}
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-white font-medium text-sm">{key.name}</span>
+                    <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium flex items-center gap-1 ${
+                      key.active
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/30'
+                        : 'bg-red-500/10 text-red-400 border border-red-500/30'
+                    }`}>
+                      <span className={`w-1 h-1 rounded-full ${key.active ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      {key.active ? 'Active' : 'Revoked'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-slate-500 flex-wrap mt-0.5">
+                    <span className="font-mono bg-slate-800/50 px-1.5 py-0.5 rounded border border-white/5">
+                      {key.id?.slice(0, 8)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <FiActivity className="text-[10px]" />
+                      {key.usageCount || 0}
+                    </span>
+                    {key.lastUsedAt && (
+                      <span>• {new Date(key.lastUsedAt).toLocaleDateString()}</span>
                     )}
                   </div>
+                </div>
 
-                  {/* Actions - Always visible on mobile */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                {/* Permissions - Compact */}
+                <div className="hidden md:flex items-center gap-1 flex-shrink-0">
+                  {key.permissions.slice(0, 3).map((perm) => (
+                    <span
+                      key={perm}
+                      className={`px-1.5 py-1 text-[10px] rounded font-medium border ${getPermissionBadgeClass(perm)}`}
+                      title={perm}
+                    >
+                      {perm.charAt(0).toUpperCase()}
+                    </span>
+                  ))}
+                  {key.permissions.length > 3 && (
+                    <span className="text-[10px] text-slate-500">+{key.permissions.length - 3}</span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Pass the actual API key value
+                      const keyValue = key.key || key.apiKey || key.id || '';
+                      setSelectedKey({ ...key, key: keyValue });
+                      setCodeLang('curl');
+                      setExampleIdx(0);
+                      setShowCodeModal(true);
+                    }}
+                    className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
+                    title="View Code Examples"
+                  >
+                    <FiCode className="text-sm" />
+                  </button>
+                  {key.active && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedKey(key);
-                        setCodeLang('curl');
-                        setExampleIdx(0);
-                        setShowCodeModal(true);
+                        handleRevoke(key.id);
                       }}
-                      className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-all"
-                      title="View Code Examples"
+                      className="p-2 text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 rounded-lg transition-all"
+                      title="Revoke"
                     >
-                      <FiCode className="text-sm" />
+                      <FiLock className="text-sm" />
                     </button>
-                    {key.active && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRevoke(key.id);
-                        }}
-                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 rounded-lg transition-all"
-                        title="Revoke"
-                      >
-                        <FiLock className="text-sm" />
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(key.id);
-                      }}
-                      className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                      title="Delete"
-                    >
-                      <FiTrash2 className="text-sm" />
-                    </button>
-                  </div>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(key.id);
+                    }}
+                    className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                    title="Delete"
+                  >
+                    <FiTrash2 className="text-sm" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -495,53 +547,72 @@ function ApiKeys() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 rounded-2xl border border-white/10 max-w-md w-full">
-            <div className="p-5 border-b border-white/10 flex items-center justify-between">
-              <h3 className="text-white font-semibold">Create API Key</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-white">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="modal-content max-w-lg w-full">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <FiKey className="text-white text-lg" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold">Create API Key</h3>
+                  <p className="text-xs text-slate-500">Configure access permissions</p>
+                </div>
+              </div>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-all">
                 <FiX className="text-xl" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-6 space-y-5">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Name</label>
+                <label className="block text-sm font-medium text-slate-400 mb-2">
+                  <FiShield className="inline-block mr-1.5 text-indigo-400" />
+                  Key Name
+                </label>
                 <input
                   type="text"
                   value={keyName}
                   onChange={(e) => setKeyName(e.target.value)}
-                  placeholder="e.g., Mobile App"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                  placeholder="e.g., Production App, Mobile Client"
+                  className="input w-full"
                   autoFocus
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Permissions</label>
-                <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-400 mb-3">
+                  <FiLock className="inline-block mr-1.5 text-indigo-400" />
+                  Permissions
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {PERMISSION_LEVELS.map((level) => {
                     const isSelected = (level.id === 'admin' && selectedPermissions.includes('admin')) ||
                       (level.id !== 'admin' && level.permissions.every(p => selectedPermissions.includes(p)));
                     return (
                       <label
                         key={level.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                        className={`p-4 rounded-xl border cursor-pointer transition-all hover-lift ${
                           isSelected
-                            ? 'bg-purple-500/10 border-purple-500/30'
-                            : 'bg-white/5 border-white/10 hover:border-white/20'
+                            ? 'bg-indigo-500/10 border-indigo-500/30 ring-2 ring-indigo-500/20'
+                            : 'bg-slate-800/30 border-white/5 hover:border-white/10'
                         }`}
                       >
-                        <input
-                          type="radio"
-                          name="permission"
-                          checked={isSelected}
-                          onChange={() => setSelectedPermissions(level.permissions)}
-                          className="w-4 h-4 text-purple-500 accent-purple-500"
-                        />
-                        <div className="flex-1">
-                          <div className="text-white font-medium text-sm">{level.name}</div>
-                          <div className="text-gray-500 text-xs">{level.description}</div>
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="radio"
+                            name="permission"
+                            checked={isSelected}
+                            onChange={() => setSelectedPermissions(level.permissions)}
+                            className="w-4 h-4 text-indigo-500 accent-indigo-500 mt-0.5"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-lg">{level.icon}</span>
+                              <span className="text-white font-medium text-sm">{level.name}</span>
+                            </div>
+                            <p className="text-xs text-slate-500">{level.description}</p>
+                          </div>
                         </div>
                       </label>
                     );
@@ -550,7 +621,10 @@ function ApiKeys() {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Expiration</label>
+                <label className="block text-sm font-medium text-slate-400 mb-3">
+                  <FiClock className="inline-block mr-1.5 text-indigo-400" />
+                  Expiration
+                </label>
                 <div className="grid grid-cols-4 gap-2">
                   {[
                     { value: '', label: 'Never' },
@@ -561,10 +635,10 @@ function ApiKeys() {
                     <button
                       key={opt.value || 'never'}
                       onClick={() => setExpiresIn(opt.value)}
-                      className={`py-2 rounded-lg text-sm transition-all ${
+                      className={`py-2.5 rounded-xl text-sm font-medium transition-all ${
                         expiresIn === opt.value
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                          ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
+                          : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
                       }`}
                     >
                       {opt.label}
@@ -573,23 +647,25 @@ function ApiKeys() {
                 </div>
               </div>
 
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-                <p className="text-yellow-400 text-xs">
-                  ⚠️ The API key will only be shown once
-                </p>
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
+                <div className="text-xl">⚠️</div>
+                <div>
+                  <p className="text-amber-400 text-sm font-medium mb-1">Important</p>
+                  <p className="text-amber-400/70 text-xs">The API key will only be shown once. Make sure to copy and store it securely.</p>
+                </div>
               </div>
             </div>
 
-            <div className="p-5 border-t border-white/10 flex justify-end gap-2">
+            <div className="p-6 border-t border-white/5 flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-gray-400 hover:text-white text-sm"
+                className="px-5 py-2.5 text-slate-400 hover:text-white text-sm font-medium rounded-xl hover:bg-white/5 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateKey}
-                className="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30"
               >
                 Create Key
               </button>
@@ -600,61 +676,73 @@ function ApiKeys() {
 
       {/* New Key Modal */}
       {showKeyModal && newKey && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 rounded-2xl border border-white/10 max-w-md w-full">
-            <div className="p-5 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center">
-                  <FiCheck className="text-white text-lg" />
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="modal-content max-w-lg w-full">
+            <div className="p-6 border-b border-white/5">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/25">
+                  <FiCheck className="text-white text-2xl" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold">API Key Created</h3>
-                  <p className="text-xs text-gray-400">Store this key securely</p>
+                  <h3 className="text-white font-semibold text-lg">API Key Created</h3>
+                  <p className="text-sm text-slate-500">Store this key securely - it won't be shown again</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-6 space-y-5">
               <div>
-                <label className="block text-xs text-gray-400 mb-1.5">API Key</label>
+                <label className="block text-xs font-medium text-slate-400 mb-2">Your API Key</label>
                 <div className="flex gap-2">
-                  <code className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2.5 text-white text-xs font-mono break-all">
+                  <code className="flex-1 bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-mono break-all">
                     {newKey.key}
                   </code>
                   <button
                     onClick={() => copyToClipboard(newKey.key)}
-                    className={`px-3 rounded-lg transition-colors ${
-                      copied ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'
+                    className={`px-4 rounded-xl transition-all flex items-center justify-center ${
+                      copied
+                        ? 'bg-green-500 text-white'
+                        : 'bg-indigo-500 hover:bg-indigo-600 text-white'
                     }`}
                   >
-                    {copied ? <FiCheck className="text-sm" /> : <FiCopy className="text-sm" />}
+                    {copied ? <FiCheck className="text-lg" /> : <FiCopy className="text-lg" />}
                   </button>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs text-gray-400 mb-1.5">Permissions</label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {newKey.permissions.map((perm) => (
-                    <span
-                      key={perm}
-                      className={`px-2 py-1 text-xs rounded ${getPermissionStyle(perm)}`}
-                    >
-                      {perm.replace('_', ' ')}
-                    </span>
-                  ))}
-                </div>
+              <div className="flex gap-2 flex-wrap">
+                {newKey.permissions.map((perm) => (
+                  <span
+                    key={perm}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium bg-gradient-to-r ${getPermissionColor(perm)} text-white`}
+                  >
+                    {perm.replace('_', ' ')}
+                  </span>
+                ))}
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1.5">Quick Test</label>
-                <code className="block bg-black/50 rounded-lg px-3 py-2.5 text-gray-300 text-xs font-mono">
-                  curl -H "Authorization: Bearer {newKey.key.slice(0, 20)}..." http://localhost:3000/api/files
-                </code>
+                <label className="block text-xs font-medium text-slate-400 mb-2">Quick Test</label>
+                <div className="flex gap-2">
+                  <code className="flex-1 bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-slate-300 text-xs font-mono overflow-x-auto">
+                    curl -H "Authorization: Bearer {newKey.key.slice(0, 24)}..." http://localhost:3000/api/files
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(`curl -H "Authorization: Bearer ${newKey.key}" http://localhost:3000/api/files`)}
+                    className={`px-3 rounded-xl transition-all flex items-center justify-center flex-shrink-0 ${
+                      copied
+                        ? 'bg-green-500 text-white'
+                        : 'bg-slate-700 hover:bg-slate-600 text-white'
+                    }`}
+                    title="Copy full curl command"
+                  >
+                    {copied ? <FiCheck className="text-lg" /> : <FiCopy className="text-lg" />}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="p-5 border-t border-white/10 flex justify-end gap-2">
+            <div className="p-6 border-t border-white/5 flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowKeyModal(false);
@@ -663,14 +751,14 @@ function ApiKeys() {
                   setExampleIdx(0);
                   setShowCodeModal(true);
                 }}
-                className="px-4 py-2 text-purple-400 hover:bg-purple-500/10 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                className="px-5 py-2.5 text-indigo-400 hover:bg-indigo-500/10 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
               >
-                <FiCode className="text-sm" />
+                <FiCode className="text-base" />
                 More Examples
               </button>
               <button
                 onClick={() => setShowKeyModal(false)}
-                className="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
               >
                 Done
               </button>
@@ -679,93 +767,100 @@ function ApiKeys() {
         </div>
       )}
 
-      {/* Code Examples Modal - Redesigned */}
+      {/* Code Examples Modal - Compact */}
       {showCodeModal && selectedKey && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 rounded-2xl border border-white/10 max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  selectedKey.active ? 'bg-purple-500/20' : 'bg-gray-500/20'
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="modal-content max-w-2xl w-full max-h-[85vh] flex flex-col">
+            {/* Header - Compact */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  selectedKey.active ? 'bg-indigo-500/20 border border-indigo-500/30' : 'bg-slate-800/50 border border-slate-700/50'
                 }`}>
-                  <FiKey className={`text-lg ${selectedKey.active ? 'text-purple-400' : 'text-gray-500'}`} />
+                  <FiKey className={`text-sm ${selectedKey.active ? 'text-indigo-400' : 'text-slate-600'}`} />
                 </div>
-                <div>
-                  <h3 className="text-white font-semibold">{selectedKey.name}</h3>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className={`px-2 py-0.5 rounded-full font-medium ${
+                <div className="min-w-0">
+                  <h3 className="text-white font-medium text-sm truncate">{selectedKey.name}</h3>
+                  <div className="flex items-center gap-1.5 text-[10px] mt-0.5">
+                    <span className={`px-1.5 py-0.5 rounded-full font-medium flex items-center gap-1 ${
                       selectedKey.active
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/30'
+                        : 'bg-red-500/10 text-red-400 border border-red-500/30'
                     }`}>
+                      <span className={`w-1 h-1 rounded-full ${selectedKey.active ? 'bg-green-500' : 'bg-red-500'}`}></span>
                       {selectedKey.active ? 'Active' : 'Revoked'}
                     </span>
-                    <span className="text-gray-500 font-mono">{selectedKey.id?.slice(0, 12)}...</span>
+                    <span className="text-slate-500 font-mono">{selectedKey.id?.slice(0, 8)}</span>
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setShowCodeModal(false)}
-                className="text-gray-400 hover:text-white p-2 hover:bg-white/5 rounded-xl transition-all"
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-all flex-shrink-0"
               >
-                <FiX className="text-xl" />
+                <FiX className="text-base" />
               </button>
             </div>
 
-            {/* Key Info Bar */}
+            {/* Key Display - Compact */}
             {selectedKey.key && (
-              <div className="px-5 py-3 bg-purple-500/10 border-b border-purple-500/20">
-                <div className="flex items-center gap-3">
-                  <FiKey className="text-purple-400 text-sm" />
-                  <code className="flex-1 bg-slate-800/50 border border-purple-500/30 rounded-lg px-3 py-2 text-purple-300 text-xs font-mono break-all">
-                    {selectedKey.key}
-                  </code>
+              <div className="px-4 py-2.5 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border-b border-indigo-500/10">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <FiKey className="text-indigo-400 text-[10px]" />
+                    <span className="text-[10px] font-medium text-slate-400">API Key</span>
+                  </div>
                   <button
                     onClick={() => copyToClipboard(selectedKey.key)}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
                       copied
                         ? 'bg-green-500/20 text-green-400'
-                        : 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-400'
+                        : 'bg-slate-800/50 hover:bg-slate-700/50 text-slate-300'
                     }`}
                   >
-                    {copied ? <FiCheck className="text-xs" /> : <FiCopy className="text-xs" />}
+                    {copied ? <FiCheck className="text-[10px]" /> : <FiCopy className="text-[10px]" />}
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
+                <code className="block bg-slate-900/50 border border-white/10 rounded px-2.5 py-2 text-slate-300 text-[10px] font-mono break-all">
+                  {selectedKey.key}
+                </code>
               </div>
             )}
 
-            {/* Permissions & Details */}
-            <div className="px-5 py-4 border-b border-white/10">
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <FiActivity className="text-gray-500 text-sm" />
-                  <span className="text-gray-400 text-xs">Used {selectedKey.usageCount || 0} times</span>
-                </div>
+            {/* Stats & Permissions - Compact */}
+            <div className="px-4 py-2.5 border-b border-white/5">
+              <div className="flex items-center gap-4 flex-wrap text-[10px] text-slate-500">
+                <span className="flex items-center gap-1">
+                  <FiActivity className="text-[10px]" />
+                  {selectedKey.usageCount || 0} requests
+                </span>
                 {selectedKey.lastUsedAt && (
-                  <div className="text-gray-500 text-xs">
-                    Last used: {new Date(selectedKey.lastUsedAt).toLocaleDateString()}
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-1.5 mt-3 flex-wrap">
-                {selectedKey.permissions?.map((perm) => (
-                  <span
-                    key={perm}
-                    className={`px-2.5 py-1 text-xs rounded-lg font-medium ${getPermissionStyle(perm)}`}
-                  >
-                    {perm === 'admin' ? 'Admin' : perm.charAt(0).toUpperCase() + perm.slice(1).replace('_', ' ')}
+                  <span className="flex items-center gap-1">
+                    <FiClock className="text-[10px]" />
+                    {new Date(selectedKey.lastUsedAt).toLocaleDateString()}
                   </span>
-                ))}
+                )}
+                <div className="flex gap-1 flex-wrap ml-auto">
+                  {selectedKey.permissions?.slice(0, 4).map((perm) => (
+                    <span
+                      key={perm}
+                      className={`px-1.5 py-1 text-[10px] rounded font-medium border ${getPermissionBadgeClass(perm)}`}
+                    >
+                      {perm.charAt(0).toUpperCase()}
+                    </span>
+                  ))}
+                  {selectedKey.permissions?.length > 4 && (
+                    <span className="text-[10px] text-slate-500">+{selectedKey.permissions.length - 4}</span>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Code Examples */}
-            <div className="flex-1 overflow-hidden flex flex-col min-h-[300px]">
+            {/* Code Examples - Compact */}
+            <div className="flex-1 overflow-hidden flex flex-col min-h-[200px]">
               {/* Language Tabs */}
-              <div className="flex items-center gap-1 px-3 py-2 bg-slate-800/30 border-b border-white/10">
-                <span className="text-gray-500 text-xs mr-2">Examples:</span>
+              <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-800/30 border-b border-white/5 overflow-x-auto">
                 {Object.entries(CODE_EXAMPLES).map(([key, lang]) => (
                   <button
                     key={key}
@@ -773,10 +868,10 @@ function ApiKeys() {
                       setCodeLang(key);
                       setExampleIdx(0);
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
                       codeLang === key
-                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/20'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
                     }`}
                   >
                     <span>{lang.icon}</span>
@@ -786,15 +881,15 @@ function ApiKeys() {
               </div>
 
               {/* Example Sub-tabs */}
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-slate-800/30 border-b border-white/10">
+              <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/20 border-b border-white/5 overflow-x-auto">
                 {CODE_EXAMPLES[codeLang].examples.map((ex, idx) => (
                   <button
                     key={idx}
                     onClick={() => setExampleIdx(idx)}
-                    className={`px-3 py-1 rounded-md text-xs transition-all ${
+                    className={`px-2.5 py-1 rounded text-[10px] transition-all whitespace-nowrap ${
                       exampleIdx === idx
                         ? 'bg-slate-700 text-white'
-                        : 'text-gray-500 hover:text-gray-300'
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
                     }`}
                   >
                     {ex.name}
@@ -802,27 +897,49 @@ function ApiKeys() {
                 ))}
               </div>
 
-              {/* Code Display */}
-              <div className="flex-1 overflow-auto bg-[#1e1e2e] p-4">
-                <pre className="text-xs font-mono text-gray-300 leading-relaxed whitespace-pre-wrap">
-                  <code>
-                    {CODE_EXAMPLES[codeLang].examples[exampleIdx].code.replace('{{API_KEY}}', selectedKey.key || 'YOUR_API_KEY')}
-                  </code>
-                </pre>
+              {/* Code Display with Copy - Compact */}
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between px-3 py-2 bg-slate-800/30 border-b border-white/5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">Example:</span>
+                    <span className="text-[10px] font-medium text-white bg-slate-700/50 px-1.5 py-0.5 rounded">
+                      {CODE_EXAMPLES[codeLang].examples[exampleIdx].name}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const code = CODE_EXAMPLES[codeLang].examples[exampleIdx].code.replace('{{API_KEY}}', selectedKey.key || 'YOUR_API_KEY');
+                      copyToClipboard(code);
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                      copied
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-slate-700/50 hover:bg-slate-600/50 text-slate-300'
+                    }`}
+                  >
+                    {copied ? <FiCheck className="text-[10px]" /> : <FiCopy className="text-[10px]" />}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <div className="flex-1 overflow-auto bg-[#1e1e2e] p-3">
+                  <pre className="text-[10px] font-mono text-slate-300 leading-relaxed whitespace-pre-wrap">
+                    <code>
+                      {CODE_EXAMPLES[codeLang].examples[exampleIdx].code.replace('{{API_KEY}}', selectedKey.key || 'YOUR_API_KEY')}
+                    </code>
+                  </pre>
+                </div>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between px-5 py-3 bg-slate-800/30 border-t border-white/10 rounded-b-2xl">
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                  Ready to use
-                </span>
+            {/* Footer - Compact */}
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-800/30 border-t border-white/5">
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                Ready to use
               </div>
               <button
                 onClick={() => setShowCodeModal(false)}
-                className="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-xs font-medium transition-all"
               >
                 Done
               </button>
