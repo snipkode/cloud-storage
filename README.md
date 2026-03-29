@@ -8,6 +8,7 @@ Cloud storage application dengan React, Firebase Authentication, dan Node.js bac
 - ✅ **Multi-Tenant** - Setiap user punya storage terpisah
 - ✅ **API Key System** - Generate API key untuk akses eksternal
 - ✅ **Permission Levels** - Read-only, Upload-only, Read-Write, Admin
+- ✅ **Folder Support** - Upload file ke folder dengan path fisik
 - ✅ **Compact UI** - Modern design dengan Tailwind CSS
 - ✅ **Drag & Drop** - Upload file dengan drag and drop
 - ✅ **REST API** - Siap diintegrasikan dengan aplikasi lain
@@ -99,6 +100,34 @@ atau
 
 ---
 
+### 📁 Folder Support
+
+API mendukung upload file ke dalam folder dengan struktur fisik:
+
+**Upload ke folder:**
+```bash
+# Header X-Folder-Path untuk menentukan folder tujuan
+curl -X POST http://localhost:3000/api/upload-multiple \
+  -H "Authorization: Bearer cs_live_xxx" \
+  -H "X-Folder-Path: /Memories" \
+  -F "files=@photo.jpg"
+```
+
+**Struktur fisik:**
+```
+server/uploads/<user-id>/
+├── file-root.jpg          (path: "/")
+└── Memories/
+    └── photo.jpg          (path: "/Memories")
+```
+
+**Delete folder:**
+- Menghapus folder metadata dari Firestore
+- Menghapus semua file di dalam folder (fisik + metadata)
+- Menghapus subfolder recursively
+
+---
+
 ### 🧪 Environment Toggle (Sandbox & Production)
 
 API mendukung **isolasi penuh** antara environment **Sandbox (Test)** dan **Production (Live)**.
@@ -170,6 +199,7 @@ Upload single file (max 50MB).
 Authorization: Bearer <api_key_or_firebase_token>
 Content-Type: multipart/form-data
 X-Environment: test|live  # Optional, default: sesuai API key environment
+X-Folder-Path: /Memories   # Optional, folder path untuk menyimpan file
 ```
 
 **Body (FormData):**
@@ -187,7 +217,8 @@ file: <file>
     "size": 1024567,
     "mimetype": "application/pdf",
     "createdAt": "2026-03-28T10:30:00.000Z",
-    "environment": "test"  # Environment tempat file disimpan
+    "environment": "test",  # Environment tempat file disimpan
+    "folderPath": "/Memories"  # Folder path tempat file disimpan
   }
 }
 ```
@@ -206,7 +237,8 @@ Upload multiple files (max 10 files, each max 50MB).
 ```
 Authorization: Bearer <api_key_or_firebase_token>
 Content-Type: multipart/form-data
-X-Environment: test|live  # Optional, default: sesuai API key environment
+X-Environment: test|live     # Optional, default: sesuai API key environment
+X-Folder-Path: /Memories      # Optional, folder path untuk menyimpan file
 ```
 
 **Body (FormData):**
@@ -225,7 +257,8 @@ files: <file1>, <file2>, ...
       "size": 1024567,
       "mimetype": "application/pdf",
       "createdAt": "2026-03-28T10:30:00.000Z",
-      "environment": "test"
+      "environment": "test",
+      "folderPath": "/Memories"
     },
     {
       "filename": "1234567891-doc2.xlsx",
@@ -233,7 +266,8 @@ files: <file1>, <file2>, ...
       "size": 2048901,
       "mimetype": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "createdAt": "2026-03-28T10:30:01.000Z",
-      "environment": "test"
+      "environment": "test",
+      "folderPath": "/Memories"
     }
   ]
 }
@@ -267,8 +301,11 @@ Authorization: Bearer <api_key_or_firebase_token>
       "filename": "1234567890-document.pdf",
       "originalname": "document.pdf",
       "size": 1024567,
+      "mimetype": "application/pdf",
       "createdAt": "2026-03-28T10:30:00.000Z",
-      "modifiedAt": "2026-03-28T10:30:00.000Z"
+      "updatedAt": "2026-03-28T10:30:00.000Z",
+      "downloadCount": 0,
+      "path": "/Memories"  # Folder path tempat file disimpan
     }
   ],
   "total": 1,
@@ -376,6 +413,117 @@ Authorization: Bearer <api_key_or_firebase_token>
   "message": "File deleted successfully"
 }
 ```
+
+**Required Permission:** `delete`
+
+---
+
+#### 📁 Create Folder
+
+**POST** `/api/folders`
+
+Create a new folder.
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+Content-Type: application/json
+X-Environment: test|live  # Optional
+```
+
+**Body:**
+```json
+{
+  "name": "Memories",
+  "parentId": null  // Optional, parent folder ID for nested folders
+}
+```
+
+**Response (201):**
+```json
+{
+  "message": "Folder created successfully",
+  "folder": {
+    "id": "folder_1234567890abcdef",
+    "name": "Memories",
+    "path": "/Memories",
+    "parentId": null,
+    "createdAt": "2026-03-28T10:30:00.000Z",
+    "environment": "live"
+  }
+}
+```
+
+**Required Permission:** `upload`
+
+---
+
+#### 📋 List Folders
+
+**GET** `/api/folders`
+
+List all folders for current user.
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+```
+
+**Query Parameters:**
+```
+?environment=test|live  # Optional, default: sesuai API key environment
+```
+
+**Response (200):**
+```json
+{
+  "folders": [
+    {
+      "id": "folder_1234567890abcdef",
+      "name": "Memories",
+      "path": "/Memories",
+      "parentId": null,
+      "createdAt": "2026-03-28T10:30:00.000Z",
+      "updatedAt": "2026-03-28T10:30:00.000Z"
+    }
+  ],
+  "total": 1,
+  "environment": "live"
+}
+```
+
+**Required Permission:** `read`
+
+---
+
+#### 🗑️ Delete Folder
+
+**DELETE** `/api/folders/:folderId`
+
+Delete a folder and all its contents (files and subfolders).
+
+**Headers:**
+```
+Authorization: Bearer <api_key_or_firebase_token>
+```
+
+**Query Parameters:**
+```
+?environment=test|live  # Optional, default: sesuai API key environment
+```
+
+**Response (200):**
+```json
+{
+  "message": "Folder and all contents deleted successfully",
+  "deletedFilesCount": 5
+}
+```
+
+> **⚠️ Important:** Delete folder akan menghapus:
+> - Semua file di folder tersebut (fisik + metadata)
+> - Semua subfolder recursively
+> - Folder metadata itu sendiri
 
 **Required Permission:** `delete`
 
@@ -671,7 +819,13 @@ cloud-storage/
 │   ├── routes/             # API routes
 │   ├── uploads/            # User files (auto-created)
 │   │   └── {userId}/       # Tenant-isolated storage
+│   │       └── Memories/   # Physical folder structure
 │   └── server.js
+├── tests/                  # Test scripts
+│   ├── test-memories-upload.js
+│   ├── test-browser-upload.js
+│   ├── test-upload-browser.js
+│   └── test-multiple-upload.sh
 └── package.json            # Root package.json
 ```
 
@@ -809,6 +963,23 @@ with open('document.pdf', 'rb') as f:
 - Max file size: **50MB** per file
 - Max upload: **10 files** sekaligus
 - Default quota: **5GB** per user (configurable)
+- Folder fisik dibuat otomatis saat upload dengan `X-Folder-Path` header
+
+## 🧪 Testing
+
+Test scripts tersedia di folder `tests/`:
+
+```bash
+# Upload ke folder /Memories
+export CLOUD_STORAGE_API_KEY="cs_live_xxx"
+node tests/test-memories-upload.js
+
+# Upload multiple files dengan curl
+bash tests/test-multiple-upload.sh
+
+# Test browser upload format
+node tests/test-browser-upload.js
+```
 
 ## 🔧 Development
 

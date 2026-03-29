@@ -1,9 +1,11 @@
 import { create } from 'zustand';
+import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export const useFilesStore = create((set, get) => ({
   files: [],
+  folders: [],
   loading: false,
   uploadProgress: 0,
   error: null,
@@ -16,7 +18,7 @@ export const useFilesStore = create((set, get) => ({
       const res = await fetch(`${API_BASE}/api/files?environment=${environment}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       // Handle 401 - Token expired
       if (res.status === 401) {
         const { useAuthStore } = await import('@store/authStore');
@@ -27,14 +29,14 @@ export const useFilesStore = create((set, get) => ({
           return fetchFiles(newToken, environment);
         }
       }
-      
+
       const data = await res.json();
       if (res.ok) {
-        set({ 
-          files: data.files, 
-          stats: data.stats, 
+        set({
+          files: data.files,
+          stats: data.stats,
           environment: data.stats?.environment || environment,
-          loading: false 
+          loading: false
         });
       } else {
         set({ error: data.error, loading: false });
@@ -44,80 +46,191 @@ export const useFilesStore = create((set, get) => ({
     }
   },
 
-  uploadFile: async (file, token, environment = 'live') => {
+  fetchFolders: async (token, environment = 'live') => {
+    set({ loading: true, error: null });
+    try {
+      const res = await fetch(`${API_BASE}/api/folders?environment=${environment}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      // Handle 401 - Token expired
+      if (res.status === 401) {
+        const { useAuthStore } = await import('@store/authStore');
+        const refreshed = await useAuthStore.getState().handleAuthError({ status: 401 });
+        if (refreshed) {
+          const newToken = useAuthStore.getState().token;
+          return get().fetchFolders(newToken, environment);
+        }
+      }
+
+      const data = await res.json();
+      if (res.ok) {
+        set({
+          folders: data.folders,
+          loading: false
+        });
+        return data.folders;
+      } else {
+        set({ error: data.error, loading: false });
+        return [];
+      }
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      return [];
+    }
+  },
+
+  createFolder: async (name, parentId, token, environment = 'live') => {
+    set({ loading: true, error: null });
+    try {
+      const res = await fetch(`${API_BASE}/api/folders`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-Environment': environment
+        },
+        body: JSON.stringify({ name, parentId })
+      });
+
+      // Handle 401 - Token expired
+      if (res.status === 401) {
+        const { useAuthStore } = await import('@store/authStore');
+        const refreshed = await useAuthStore.getState().handleAuthError({ status: 401 });
+        if (refreshed) {
+          const newToken = useAuthStore.getState().token;
+          return get().createFolder(name, parentId, newToken, environment);
+        }
+      }
+
+      const data = await res.json();
+      if (res.ok) {
+        // Refresh folders after creation
+        await get().fetchFolders(token, environment);
+        set({ loading: false });
+        return { success: true, folder: data.folder };
+      } else {
+        set({ error: data.error, loading: false });
+        return { success: false, error: data.error };
+      }
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      return { success: false, error: error.message };
+    }
+  },
+
+  deleteFolder: async (folderId, token, environment = 'live') => {
+    set({ loading: true, error: null });
+    try {
+      const res = await fetch(`${API_BASE}/api/folders/${encodeURIComponent(folderId)}?environment=${environment}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      // Handle 401 - Token expired
+      if (res.status === 401) {
+        const { useAuthStore } = await import('@store/authStore');
+        const refreshed = await useAuthStore.getState().handleAuthError({ status: 401 });
+        if (refreshed) {
+          const newToken = useAuthStore.getState().token;
+          return get().deleteFolder(folderId, newToken, environment);
+        }
+      }
+
+      const data = await res.json();
+      if (res.ok) {
+        // Refresh folders after deletion
+        await get().fetchFolders(token, environment);
+        set({ loading: false });
+        return { success: true };
+      } else {
+        set({ error: data.error, loading: false });
+        return { success: false, error: data.error };
+      }
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      return { success: false, error: error.message };
+    }
+  },
+
+  uploadFile: async (file, token, environment = 'live', folderPath = null) => {
     set({ loading: true, uploadProgress: 0, error: null });
 
-    return new Promise((resolve) => {
+    try {
       const formData = new FormData();
       formData.append('file', file);
 
-      const xhr = new XMLHttpRequest();
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'X-Environment': environment,
+        'Content-Type': 'multipart/form-data'
+      };
 
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          set({ uploadProgress: (e.loaded / e.total) * 100 });
+      if (folderPath) {
+        headers['X-Folder-Path'] = folderPath;
+      }
+
+      const response = await axios.post(`${API_BASE}/api/upload`, formData, {
+        headers,
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            set({ uploadProgress: (progressEvent.loaded / progressEvent.total) * 100 });
+          }
         }
       });
 
-      xhr.addEventListener('load', async () => {
-        if (xhr.status === 201) {
-          await get().fetchFiles(token, environment);
-          resolve({ success: true });
-        } else {
-          const data = JSON.parse(xhr.responseText);
-          set({ error: data.error, loading: false });
-          resolve({ success: false, error: data.error });
-        }
-      });
-
-      xhr.addEventListener('error', () => {
-        set({ error: 'Upload failed', loading: false });
-        resolve({ success: false, error: 'Upload failed' });
-      });
-
-      xhr.open('POST', `${API_BASE}/api/upload`);
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.setRequestHeader('X-Environment', environment);
-      xhr.send(formData);
-    });
+      if (response.status === 201) {
+        await get().fetchFiles(token, environment);
+        return { success: true };
+      } else {
+        set({ error: response.data?.error || 'Upload failed' });
+        return { success: false, error: response.data?.error || 'Upload failed' };
+      }
+    } catch (error) {
+      console.error('Upload file error:', error);
+      set({ error: error.response?.data?.error || 'Upload failed' });
+      return { success: false, error: error.response?.data?.error || 'Upload failed' };
+    }
   },
 
-  uploadMultiple: async (files, token, environment = 'live') => {
+  uploadMultiple: async (files, token, environment = 'live', folderPath = null) => {
     set({ loading: true, uploadProgress: 0, error: null });
 
-    return new Promise((resolve) => {
+    try {
       const formData = new FormData();
       files.forEach(file => formData.append('files', file));
 
-      const xhr = new XMLHttpRequest();
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'X-Environment': environment,
+        'Content-Type': 'multipart/form-data'
+      };
 
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          set({ uploadProgress: (e.loaded / e.total) * 100 });
+      if (folderPath) {
+        headers['X-Folder-Path'] = folderPath;
+      }
+
+      const response = await axios.post(`${API_BASE}/api/upload-multiple`, formData, {
+        headers,
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            set({ uploadProgress: (progressEvent.loaded / progressEvent.total) * 100 });
+          }
         }
       });
 
-      xhr.addEventListener('load', async () => {
-        if (xhr.status === 201) {
-          await get().fetchFiles(token, environment);
-          resolve({ success: true });
-        } else {
-          const data = JSON.parse(xhr.responseText);
-          set({ error: data.error, loading: false });
-          resolve({ success: false, error: data.error });
-        }
-      });
-
-      xhr.addEventListener('error', () => {
-        set({ error: 'Upload failed', loading: false });
-        resolve({ success: false, error: 'Upload failed' });
-      });
-
-      xhr.open('POST', `${API_BASE}/api/upload-multiple`);
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.setRequestHeader('X-Environment', environment);
-      xhr.send(formData);
-    });
+      if (response.status === 201) {
+        await get().fetchFiles(token, environment);
+        return { success: true };
+      } else {
+        set({ error: response.data?.error || 'Upload failed' });
+        return { success: false, error: response.data?.error || 'Upload failed' };
+      }
+    } catch (error) {
+      console.error('Upload multiple error:', error);
+      set({ error: error.response?.data?.error || 'Upload failed' });
+      return { success: false, error: error.response?.data?.error || 'Upload failed' };
+    }
   },
 
   deleteFile: async (filename, token, environment = 'live') => {

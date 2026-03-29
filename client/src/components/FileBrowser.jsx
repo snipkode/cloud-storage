@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 import {
   FiGrid, FiList, FiPlus, FiSearch, FiMoreVertical, FiDownload,
-  FiTrash2, FiFolder, FiX, FiUpload, FiCheck, FiCloud, FiFile,
+  FiTrash2, FiFolder, FiX, FiUpload, FiCheck, FiCheckSquare, FiCloud, FiFile,
   FiImage, FiFilm, FiMusic, FiCode, FiSettings, FiBook, FiBarChart, FiInfo,
   FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut
 } from 'react-icons/fi';
@@ -91,7 +91,7 @@ const formatRelativeTime = (date) => {
 
 function FileBrowser() {
   const { token } = useAuthStore();
-  const { files, loading, uploadProgress, error, fetchFiles, uploadMultiple, deleteFile, downloadFile, clearError, environment } = useFilesStore();
+  const { files, folders, loading, uploadProgress, error, fetchFiles, fetchFolders, uploadMultiple, deleteFile, deleteFolder, createFolder, downloadFile, clearError, environment } = useFilesStore();
 
   // View state
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('fileBrowserView') || 'grid');
@@ -106,6 +106,7 @@ function FileBrowser() {
 
   // Selection state
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [selectMode, setSelectMode] = useState(false);
 
   // Preview/Lightbox state
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -131,12 +132,17 @@ function FileBrowser() {
   const contextMenuRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Load files when environment changes
+  // Load files and folders when environment changes
   useEffect(() => {
-    console.log(`[FileBrowser] Loading files for environment: ${currentEnvironment}`);
-    if (token) {
-      fetchFiles(token, currentEnvironment);
-    }
+    const loadData = async () => {
+      if (token) {
+        await Promise.all([
+          fetchFiles(token, currentEnvironment),
+          fetchFolders(token, currentEnvironment)
+        ]);
+      }
+    };
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, currentEnvironment]);
 
@@ -283,28 +289,61 @@ function FileBrowser() {
 
   // Filter files based on current folder, search and file type (memoized)
   const filteredFiles = useMemo(() => {
-    return files.filter(file => {
+    // Merge folders and files, adding type property
+    const foldersWithType = (folders || []).map(f => ({ ...f, type: 'folder' }));
+    const filesWithType = (files || []).map(f => ({ ...f, type: 'file' }));
+    const allItems = [...foldersWithType, ...filesWithType];
+
+    const result = allItems.filter(file => {
       const matchesSearch = !debouncedSearch ||
-        (file.originalname || file.filename).toLowerCase().includes(debouncedSearch.toLowerCase());
-      const matchesFolder = currentFolder
-        ? file.path?.startsWith(currentFolder.path || '/')
-        : (!file.path || file.path === '/');
-      
-      // Filter by file type
+        ((file.originalname || file.filename) || file.name)?.toLowerCase().includes(debouncedSearch.toLowerCase());
+
+      // Folder matching logic:
+      // - At root (currentFolder = null): show items with path = '/' or path = '/folderName' (single level)
+      // - In folder: show items whose path starts with currentFolder.path + '/' (direct children only)
+      let matchesFolder;
+      if (currentFolder) {
+        // Inside a folder: show only direct children (not nested deeper)
+        const parentPathWithSlash = currentFolder.path.endsWith('/') ? currentFolder.path : currentFolder.path + '/';
+        if (file.type === 'folder') {
+          // For folders: must be direct child (only one segment after parent path)
+          matchesFolder = file.path.startsWith(parentPathWithSlash);
+          const relativePath = file.path.substring(parentPathWithSlash.length);
+          // Only show if it's a direct child (no more slashes)
+          matchesFolder = matchesFolder && !relativePath.includes('/');
+        } else {
+          // For files: must be in this folder
+          matchesFolder = file.path === currentFolder.path || file.path === parentPathWithSlash;
+        }
+      } else {
+        // At root: show items at root level (path = '/' for files, or '/folderName' for folders with single level)
+        if (file.type === 'folder') {
+          // For folders at root: path should be like '/folderName' (only one segment)
+          const pathSegments = (file.path || '/').split('/').filter(s => s);
+          matchesFolder = pathSegments.length === 1;
+        } else {
+          // For files at root: path should be '/' or empty
+          matchesFolder = !file.path || file.path === '/';
+        }
+      }
+
+      // Filter by file type (folders are always shown, file type filter applies only to files)
       let matchesType = true;
       if (fileTypeFilter !== 'all' && file.type !== 'folder') {
         const fileCategory = getFileTypeCategory(file.mimetype, file.originalname || file.filename);
         matchesType = fileCategory === fileTypeFilter;
       }
-      
+
       return matchesSearch && matchesFolder && matchesType;
     });
-  }, [files, debouncedSearch, currentFolder, fileTypeFilter]);
+
+    return result;
+  }, [files, folders, debouncedSearch, currentFolder, fileTypeFilter]);
 
   // Separate folders and files (memoized)
-  const { folders, fileList } = useMemo(() => {
+  const { folderItems, fileList } = useMemo(() => {
     return {
-      folders: filteredFiles.filter(f => f.type === 'folder'),
+      folderItems: filteredFiles.filter(f => f.type === 'folder'),
       fileList: filteredFiles.filter(f => f.type !== 'folder')
     };
   }, [filteredFiles]);
@@ -316,20 +355,81 @@ function FileBrowser() {
 
   // Handle file/folder selection
   const handleSelect = (item, multi = false) => {
-    setSelectedFiles(prev =>
-      prev.includes(item) ? prev.filter(f => f !== item) : [...prev, item]
-    );
+    if (selectMode) {
+      // In select mode: toggle selection
+      setSelectedFiles(prev =>
+        prev.includes(item) ? prev.filter(f => f !== item) : [...prev, item]
+      );
+    } else if (multi) {
+      // Ctrl/Cmd click: multi-select
+      setSelectedFiles(prev =>
+        prev.includes(item) ? prev.filter(f => f !== item) : [...prev, item]
+      );
+    } else {
+      // Normal click: single select
+      setSelectedFiles(prev =>
+        prev.includes(item) ? prev.filter(f => f !== item) : [item]
+      );
+    }
   };
 
   // Handle double click (open folder or download file)
   const handleDoubleClick = (item) => {
     if (item.type === 'folder') {
+      // Navigate into folder
       setFolderHistory(prev => [...prev, currentFolder]);
       setCurrentFolder(item);
       setSelectedFiles([]);
     } else {
+      // Download file
       downloadFile(item.filename, token, currentEnvironment);
     }
+  };
+
+  // Handle single click
+  const handleClick = (item, e) => {
+    if (item.type === 'folder') {
+      // Single click on folder: navigate into it
+      setFolderHistory(prev => [...prev, currentFolder]);
+      setCurrentFolder(item);
+      setSelectedFiles([]);
+    } else if (selectMode || (e.ctrlKey || e.metaKey)) {
+      // In select mode or Ctrl/Cmd click: select file
+      handleSelect(item, e.ctrlKey || e.metaKey);
+    } else if (isPreviewable(item)) {
+      // Previewable file: open preview
+      openPreview(item);
+    } else {
+      // Other files: select
+      handleSelect(item, false);
+    }
+  };
+
+  // Toggle select mode
+  const toggleSelectMode = () => {
+    setSelectMode(!selectMode);
+    if (selectMode) {
+      setSelectedFiles([]);
+    }
+  };
+
+  // Navigate up one level
+  const handleNavigateUp = () => {
+    if (!currentFolder) return;
+    
+    // Go to parent folder
+    const currentPath = currentFolder.path;
+    const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+    
+    if (parentPath === '') {
+      // At root level
+      setCurrentFolder(null);
+      setFolderHistory([]);
+    } else {
+      const parentFolder = folders?.find(f => f.path === parentPath);
+      setCurrentFolder(parentFolder || null);
+    }
+    setSelectedFiles([]);
   };
 
   // Create new folder
@@ -338,9 +438,20 @@ function FileBrowser() {
 
     setIsCreatingFolder(true);
     try {
-      // TODO: Implement folder creation API
-      setShowNewFolderModal(false);
-      setNewFolderName('');
+      const parentId = currentFolder?.id || null;
+      const result = await createFolder(newFolderName.trim(), parentId, token, currentEnvironment);
+
+      if (result.success) {
+        setShowNewFolderModal(false);
+        setNewFolderName('');
+        // Refresh files and folders to show the new folder
+        await Promise.all([
+          fetchFiles(token, currentEnvironment),
+          fetchFolders(token, currentEnvironment)
+        ]);
+      } else {
+        console.error('Failed to create folder:', result.error);
+      }
     } catch (err) {
       console.error('Failed to create folder:', err);
     } finally {
@@ -354,7 +465,9 @@ function FileBrowser() {
     if (selectedFiles.length > 0) {
       setIsUploading(true);
       try {
-        await uploadMultiple(selectedFiles, token, currentEnvironment);
+        // Upload to current folder if inside one
+        const folderPath = currentFolder?.path || null;
+        await uploadMultiple(selectedFiles, token, currentEnvironment, folderPath);
       } catch (err) {
         console.error('Upload failed:', err);
       } finally {
@@ -373,12 +486,17 @@ function FileBrowser() {
     setIsDeleting(true);
     try {
       if (item.type === 'folder') {
-        // TODO: Implement folder delete API
+        await deleteFolder(item.id, token, currentEnvironment);
       } else {
         await deleteFile(item.filename, token, currentEnvironment);
       }
       setSelectedFiles([]);
       setContextMenu(null);
+      // Refresh files and folders after deletion
+      await Promise.all([
+        fetchFiles(token, currentEnvironment),
+        fetchFolders(token, currentEnvironment)
+      ]);
     } catch (err) {
       console.error('Delete failed:', err);
     } finally {
@@ -395,12 +513,17 @@ function FileBrowser() {
     try {
       for (const item of selectedFiles) {
         if (item.type === 'folder') {
-          // TODO: Implement folder delete API
+          await deleteFolder(item.id, token, currentEnvironment);
         } else {
           await deleteFile(item.filename, token, currentEnvironment);
         }
       }
       setSelectedFiles([]);
+      // Refresh files and folders after deletion
+      await Promise.all([
+        fetchFiles(token, currentEnvironment),
+        fetchFolders(token, currentEnvironment)
+      ]);
     } catch (err) {
       console.error('Delete failed:', err);
     } finally {
@@ -530,9 +653,6 @@ function FileBrowser() {
                 {currentFolder ? 'Browse folder contents' : 'Manage and organize your files'}
               </p>
             </div>
-            <span className="text-[10px] text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded-full flex-shrink-0 hidden sm:inline">
-              {folders.length + fileList.length} items
-            </span>
           </div>
 
           {/* Environment Toggle */}
@@ -544,53 +664,90 @@ function FileBrowser() {
           </div>
         </div>
 
-        {/* Action Buttons Row - Mobile: Stacked (View Toggle on top, Upload/New Folder below), Desktop: Inline */}
+        {/* Action Buttons Row */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {/* Top Row: View Toggle (Mobile) / Right: View Toggle (Desktop) */}
-          <div className="flex items-center justify-between sm:justify-end gap-2 border-b sm:border-b-0 border-white/5 pb-2 sm:pb-0 order-first">
-            <span className="text-[10px] text-slate-500">
-              {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
-            </span>
-            <div className="flex bg-slate-800/50 rounded-md p-0.5 border border-white/10">
+          {/* Right side: View Toggle, Upload, New Folder, Select Mode */}
+          <div className="flex items-center justify-end gap-2 flex-1">
+            {/* Select Mode Toggle */}
+            <button
+              onClick={toggleSelectMode}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all min-w-[50px] ${
+                selectMode || selectedFiles.length > 0
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30'
+                  : 'bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white'
+              }`}
+              title={selectMode ? 'Exit select mode' : 'Select files'}
+            >
+              {selectMode ? (
+                <>
+                  <FiX className="text-base" />
+                  <span className="hidden sm:inline">Cancel</span>
+                </>
+              ) : (
+                <>
+                  <FiCheckSquare className="text-base" />
+                  <span className="hidden sm:inline">Select</span>
+                </>
+              )}
+              {selectedFiles.length > 0 && (
+                <span className="text-xs font-bold bg-red-500 text-white px-2 py-0.5 rounded-full min-w-[24px]">{selectedFiles.length}</span>
+              )}
+            </button>
+
+            {/* Delete Button (shown when files selected) */}
+            {selectedFiles.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 hidden sm:inline">
+                  {selectedFiles.length} selected
+                </span>
+                <button
+                  onClick={handleDeleteSelected}
+                  disabled={isDeleting}
+                  className="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all min-w-[50px] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/30"
+                  title="Delete selected"
+                >
+                  <FiTrash2 className="text-base" />
+                  <span className="hidden sm:inline">Delete</span>
+                </button>
+              </div>
+            )}
+
+            {/* View Toggle */}
+            <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/10">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all min-w-[40px] ${
                   viewMode === 'grid' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <FiGrid className="text-xs" />
-                <span className="hidden xs:inline">Grid</span>
+                <FiGrid className="text-sm" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-medium transition-all ${
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all min-w-[40px] ${
                   viewMode === 'list' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <FiList className="text-xs" />
-                <span className="hidden xs:inline">List</span>
+                <FiList className="text-sm" />
               </button>
             </div>
-          </div>
 
-          {/* Bottom Row: Upload & New Folder (Mobile) / Left: Upload & New Folder (Desktop) */}
-          <div className="flex items-center gap-2 flex-1 order-last sm:order-first">
             {/* Upload */}
             <button
               onClick={() => setUploadModalOpen(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition-all shadow-lg shadow-indigo-500/25 min-w-[100px]"
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-indigo-500/25 min-w-[50px]"
             >
-              <FiUpload className="text-xs" />
-              <span>Upload</span>
+              <FiUpload className="text-base" />
+              <span className="hidden sm:inline">Upload</span>
             </button>
 
             {/* New Folder */}
             <button
               onClick={() => setShowNewFolderModal(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white px-3 py-2 rounded-lg text-xs font-medium transition-all min-w-[100px]"
+              className="flex items-center justify-center gap-2 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-all min-w-[50px]"
             >
-              <FiPlus className="text-xs" />
-              <span>New Folder</span>
+              <FiPlus className="text-base" />
+              <span className="hidden sm:inline">New Folder</span>
             </button>
           </div>
         </div>
@@ -608,7 +765,7 @@ function FileBrowser() {
         </div>
 
         {/* File Type Filter - Grid Cards - Compact */}
-        <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 mb-3">
           {[
             { id: 'all', label: 'All', icon: FiFolder, color: 'from-slate-500 to-slate-600' },
             { id: 'photo', label: 'Photo', icon: FiImage, color: 'from-pink-500 to-rose-500' },
@@ -686,25 +843,128 @@ function FileBrowser() {
         </div>
       )}
 
+      {/* Navigation Bar: Back + Up + Breadcrumbs */}
+      <div className="flex items-center gap-1 bg-slate-800/30 border border-white/5 rounded-lg px-2 py-1.5 mb-2">
+        {/* Back Button */}
+        <button
+          onClick={() => {
+            if (folderHistory.length > 0) {
+              const prevFolder = folderHistory[folderHistory.length - 1];
+              setFolderHistory(prev => prev.slice(0, -1));
+              setCurrentFolder(prevFolder);
+              setSelectedFiles([]);
+            } else if (currentFolder) {
+              handleNavigateUp();
+            }
+          }}
+          disabled={!currentFolder && folderHistory.length === 0}
+          className="flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+          title="Go back"
+        >
+          <FiChevronLeft className="text-sm" />
+        </button>
+
+        {/* Up Button */}
+        <button
+          onClick={handleNavigateUp}
+          disabled={!currentFolder}
+          className="flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
+          title="Up one level"
+        >
+          <FiChevronRight className="text-sm rotate-[-90deg]" />
+        </button>
+
+        {/* Breadcrumbs Navigation */}
+        <div className="flex items-center gap-0.5 text-[11px] text-slate-400 overflow-x-auto flex-1 min-w-0 ml-1">
+          <button
+            onClick={() => {
+              setCurrentFolder(null);
+              setFolderHistory([]);
+              setSelectedFiles([]);
+            }}
+            className="flex items-center gap-1 hover:text-indigo-400 transition-colors flex-shrink-0"
+            title="Root"
+          >
+            <FiCloud className="text-xs flex-shrink-0" />
+            <span className="whitespace-nowrap font-medium">Root</span>
+          </button>
+          {currentFolder && (
+            <>
+              <FiChevronRight className="text-xs flex-shrink-0 opacity-50" />
+              {(() => {
+                const pathParts = currentFolder.path.split('/').filter(p => p);
+                let accumulatedPath = '';
+
+                return pathParts.map((part, index) => {
+                  accumulatedPath = accumulatedPath ? `${accumulatedPath}/${part}` : `/${part}`;
+
+                  return (
+                    <Fragment key={index}>
+                      <button
+                        onClick={() => {
+                          const targetFolder = folders?.find(f => f.path === accumulatedPath);
+                          if (targetFolder) {
+                            setCurrentFolder(targetFolder);
+                            setFolderHistory(prev => {
+                              const newHistory = prev.slice(0, index);
+                              if (index > 0) {
+                                const parentPath = accumulatedPath.substring(0, accumulatedPath.lastIndexOf('/'));
+                                const parentFolder = folders?.find(f => f.path === parentPath);
+                                if (parentFolder && !newHistory.includes(parentFolder)) {
+                                  newHistory.push(parentFolder);
+                                }
+                              }
+                              return newHistory;
+                            });
+                          }
+                          setSelectedFiles([]);
+                        }}
+                        className="hover:text-indigo-400 transition-colors flex-shrink-0 truncate max-w-[100px] font-medium"
+                        title={part}
+                      >
+                        {part}
+                      </button>
+                      {index < pathParts.length - 1 && (
+                        <FiChevronRight className="text-xs flex-shrink-0 opacity-50" />
+                      )}
+                    </Fragment>
+                  );
+                });
+              })()}
+            </>
+          )}
+        </div>
+      </div>
+
       {/* File Grid/List */}
       {viewMode === 'grid' ? (
         filteredFiles.length === 0 ? (
           /* Grid Empty State - Compact */
           <div className="h-full flex items-center justify-center">
-            <div className="text-center py-6">
-              <div className="w-10 h-10 mx-auto mb-2 bg-slate-800/50 rounded-lg flex items-center justify-center">
-                <FiCloud className="text-xl text-slate-600" />
+            <div className="text-center py-4">
+              <div className="w-12 h-12 mx-auto mb-2 bg-slate-800/50 rounded-lg flex items-center justify-center">
+                {debouncedSearch ? (
+                  <FiSearch className="text-xl text-slate-600" />
+                ) : currentFolder ? (
+                  <FiFolder className="text-xl text-slate-600" />
+                ) : (
+                  <FiCloud className="text-xl text-slate-600" />
+                )}
               </div>
-              <p className="text-slate-400 text-xs mb-2">
-                {debouncedSearch ? 'No files match your search' : 'This folder is empty'}
+              <p className="text-slate-400 text-xs font-medium mb-3">
+                {debouncedSearch
+                  ? 'No matches'
+                  : currentFolder
+                    ? 'Empty folder'
+                    : 'No files yet'}
               </p>
               {!debouncedSearch && (
                 <button
                   onClick={() => setUploadModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors"
+                  className="inline-flex items-center gap-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                 >
                   <FiUpload className="text-xs" />
-                  Upload file
+                  Upload
                 </button>
               )}
             </div>
@@ -713,11 +973,11 @@ function FileBrowser() {
           /* Grid View */
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2 mt-3 mb-20">
           {/* Folders */}
-          {folders.map((folder) => (
+          {folderItems.map((folder) => (
             <div
               key={folder.id || folder.filename}
               onDoubleClick={() => handleDoubleClick(folder)}
-              onClick={(e) => handleSelect(folder, e.ctrlKey || e.metaKey)}
+              onClick={(e) => handleClick(folder, e)}
               className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
                 selectedFiles.includes(folder)
                   ? 'border-indigo-500 bg-indigo-500/10'
@@ -750,24 +1010,17 @@ function FileBrowser() {
             const IconComponent = fileIcon.icon;
             const previewable = isPreviewable(file);
             const isImage = file.mimetype?.includes('image');
-            
+
             return (
               <div
                 key={file.id || file.filename}
                 onDoubleClick={() => handleDoubleClick(file)}
-                onClick={(e) => {
-                  if (previewable && e.ctrlKey) {
-                    e.preventDefault();
-                    openPreview(file);
-                  } else {
-                    handleSelect(file, e.ctrlKey || e.metaKey);
-                  }
-                }}
+                onClick={(e) => handleClick(file, e)}
                 className={`group aspect-square bg-slate-800/30 hover:bg-slate-700/30 border rounded-xl flex flex-col items-center transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg relative ${
                   selectedFiles.includes(file)
                     ? 'border-indigo-500 bg-indigo-500/10'
                     : 'border-white/5 hover:border-indigo-500/30'
-                }`}
+                } ${previewable ? 'hover:bg-slate-700/50' : ''}`}
               >
                 {/* Thumbnail for images */}
                 {isImage ? (
@@ -845,14 +1098,6 @@ function FileBrowser() {
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-white/5">
-                <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-10">
-                  <input
-                    type="checkbox"
-                    checked={selectedFiles.length === filteredFiles.length && filteredFiles.length > 0}
-                    onChange={toggleSelectAll}
-                    className="rounded border-slate-600 bg-slate-700/50 text-indigo-500 focus:ring-indigo-500/50 w-4 h-4"
-                  />
-                </th>
                 <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-auto">Name</th>
                 <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-24 hidden sm:table-cell">Size</th>
                 <th className="text-left text-xs font-medium text-slate-500 px-4 py-3 w-32 hidden md:table-cell">Modified</th>
@@ -860,11 +1105,11 @@ function FileBrowser() {
             </thead>
             <tbody>
               {/* Folders */}
-              {folders.map((folder) => (
+              {folderItems.map((folder) => (
                 <tr
                   key={folder.id || folder.filename}
                   onDoubleClick={() => handleDoubleClick(folder)}
-                  onClick={() => handleSelect(folder)}
+                  onClick={() => handleClick(folder, {})}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setContextMenu({ x: e.clientX, y: e.clientY, item: folder });
@@ -873,14 +1118,6 @@ function FileBrowser() {
                     selectedFiles.includes(folder) ? 'bg-indigo-500/10' : ''
                   }`}
                 >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedFiles.includes(folder)}
-                      onChange={(e) => e.stopPropagation()}
-                      className="rounded border-slate-600 bg-slate-700/50 text-indigo-500 focus:ring-indigo-500/50 w-4 h-4"
-                    />
-                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-amber-400/20 to-orange-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -902,27 +1139,20 @@ function FileBrowser() {
               {fileList.map((file) => {
                 const fileIcon = getFileIcon(file.mimetype, file.filename);
                 const IconComponent = fileIcon.icon;
+                const previewable = isPreviewable(file);
                 return (
                   <tr
                     key={file.id || file.filename}
                     onDoubleClick={() => handleDoubleClick(file)}
-                    onClick={() => handleSelect(file)}
+                    onClick={(e) => handleClick(file, e)}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setContextMenu({ x: e.clientX, y: e.clientY, item: file });
                     }}
                     className={`border-b border-white/5 hover:bg-slate-700/30 cursor-pointer transition-colors group ${
                       selectedFiles.includes(file) ? 'bg-indigo-500/10' : ''
-                    }`}
+                    } ${previewable ? 'hover:bg-slate-700/50' : ''}`}
                   >
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedFiles.includes(file)}
-                        onChange={(e) => e.stopPropagation()}
-                        className="rounded border-slate-600 bg-slate-700/50 text-indigo-500 focus:ring-indigo-500/50 w-4 h-4"
-                      />
-                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 ${fileIcon.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
@@ -950,12 +1180,18 @@ function FileBrowser() {
 
           {/* Empty state - Compact */}
           {filteredFiles.length === 0 && (
-            <div className="p-8 text-center">
-              <div className="w-12 h-12 mx-auto mb-3 bg-slate-800/50 rounded-xl flex items-center justify-center">
-                <FiCloud className="text-2xl text-slate-600" />
+            <div className="py-6 text-center">
+              <div className="w-10 h-10 mx-auto mb-2 bg-slate-800/50 rounded-lg flex items-center justify-center">
+                {debouncedSearch ? (
+                  <FiSearch className="text-lg text-slate-600" />
+                ) : currentFolder ? (
+                  <FiFolder className="text-lg text-slate-600" />
+                ) : (
+                  <FiCloud className="text-lg text-slate-600" />
+                )}
               </div>
               <p className="text-slate-400 text-xs mb-2">
-                {debouncedSearch ? 'No files match your search' : 'This folder is empty'}
+                {debouncedSearch ? 'No matches' : currentFolder ? 'Empty folder' : 'No files yet'}
               </p>
               {!debouncedSearch && (
                 <button
@@ -963,7 +1199,7 @@ function FileBrowser() {
                   className="inline-flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-colors"
                 >
                   <FiUpload className="text-xs" />
-                  Upload file
+                  Upload
                 </button>
               )}
             </div>
@@ -1077,7 +1313,9 @@ function FileBrowser() {
                     e.preventDefault();
                     const droppedFiles = Array.from(e.dataTransfer.files);
                     if (droppedFiles.length > 0) {
-                      uploadMultiple(droppedFiles, token, currentEnvironment);
+                      // Upload to current folder if inside one
+                      const folderPath = currentFolder?.path || null;
+                      uploadMultiple(droppedFiles, token, currentEnvironment, folderPath);
                       setUploadModalOpen(false);
                     }
                   }}
@@ -1296,14 +1534,18 @@ function FileBrowser() {
             top: Math.min(contextMenu.y, typeof window !== 'undefined' ? window.innerHeight - 100 : contextMenu.y)
           }}
         >
-          <button
-            onClick={() => handleDownload(contextMenu.item)}
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-all"
-          >
-            <FiDownload className="text-sm" />
-            Download
-          </button>
-          <div className="border-t border-white/5 my-1"></div>
+          {/* Download - only for files */}
+          {contextMenu.item.type !== 'folder' && (
+            <button
+              onClick={() => handleDownload(contextMenu.item)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-all"
+            >
+              <FiDownload className="text-sm" />
+              Download
+            </button>
+          )}
+          
+          {/* Delete */}
           <button
             onClick={() => handleDelete(contextMenu.item)}
             disabled={isDeleting}
