@@ -1194,7 +1194,7 @@ function FileBrowser() {
           </div>
 
           {/* Preview content */}
-          <div className="max-w-[90vw] max-h-[90vh] flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 flex items-center justify-center p-4 overflow-visible" onClick={(e) => e.stopPropagation()}>
             {previewFiles[previewIndex].mimetype?.includes('pdf') ? (
               /* PDF Preview */
               <div className="w-full h-full max-w-4xl">
@@ -1215,8 +1215,8 @@ function FileBrowser() {
               <img
                 src={previewUrl}
                 alt={previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
-                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl transition-transform duration-200"
-                style={{ transform: `scale(${zoom})` }}
+                className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                style={{ transform: `scale(${zoom})`, transformOrigin: "center center", transition: "transform 0.2s ease-out" }}
               />
             ) : (
               /* Error state */
