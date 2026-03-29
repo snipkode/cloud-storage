@@ -1,4 +1,4 @@
-const { db, initialized: firestoreInitialized } = require('./firebase-admin');
+const { db, initialized: firestoreInitialized, getInitialized } = require('./firebase-admin');
 const { hashApiKey } = require('./api-key-generator');
 const fs = require('fs');
 const path = require('path');
@@ -10,6 +10,17 @@ const dataDir = path.dirname(API_KEYS_FILE);
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
+
+/**
+ * Check if Firestore is ready (with initialization wait)
+ */
+const isFirestoreReady = async () => {
+  if (firestoreInitialized && db) {
+    await getInitialized();
+    return firestoreInitialized;
+  }
+  return false;
+};
 
 /**
  * Load all API keys from filesystem
@@ -46,7 +57,7 @@ const createApiKey = async (apiKeyData) => {
     active: true
   };
 
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     await db.collection('apiKeys').doc(newKey.id).set(newKey);
   } else {
     const keys = loadApiKeys();
@@ -61,7 +72,7 @@ const createApiKey = async (apiKeyData) => {
  * Get API key by hashed key
  */
 const getApiKeyByHash = async (keyHash) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const snapshot = await db.collection('apiKeys')
       .where('keyHash', '==', keyHash)
       .limit(1)
@@ -81,7 +92,7 @@ const getApiKeyByHash = async (keyHash) => {
  * Get API key by ID
  */
 const getApiKeyById = async (id) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const doc = await db.collection('apiKeys').doc(id).get();
     if (!doc.exists) return null;
     return { id: doc.id, ...doc.data() };
@@ -95,7 +106,7 @@ const getApiKeyById = async (id) => {
  * Get all API keys for a user
  */
 const getUserApiKeys = async (userId) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const snapshot = await db.collection('apiKeys')
       .where('userId', '==', userId)
       .orderBy('createdAt', 'desc')
@@ -136,7 +147,7 @@ const getUserApiKeys = async (userId) => {
  * Update API key usage
  */
 const updateApiKeyUsage = async (keyHash) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const apiKey = await getApiKeyByHash(keyHash);
     if (!apiKey) return null;
 
@@ -163,7 +174,7 @@ const updateApiKeyUsage = async (keyHash) => {
  * Revoke API key
  */
 const revokeApiKey = async (id, userId) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const apiKey = await getApiKeyById(id);
     if (!apiKey || apiKey.userId !== userId) return false;
     await db.collection('apiKeys').doc(id).update({ active: false });
@@ -182,7 +193,7 @@ const revokeApiKey = async (id, userId) => {
  * Delete API key
  */
 const deleteApiKey = async (id, userId) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const apiKey = await getApiKeyById(id);
     if (!apiKey || apiKey.userId !== userId) return false;
     await db.collection('apiKeys').doc(id).delete();

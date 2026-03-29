@@ -1,4 +1,4 @@
-const { db, initialized: firestoreInitialized } = require('./firebase-admin');
+const { db, initialized: firestoreInitialized, getInitialized } = require('./firebase-admin');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,6 +9,17 @@ const METADATA_DIR = path.join(process.cwd(), 'data', 'metadata');
 if (!fs.existsSync(METADATA_DIR)) {
   fs.mkdirSync(METADATA_DIR, { recursive: true });
 }
+
+/**
+ * Check if Firestore is ready (with initialization wait)
+ */
+const isFirestoreReady = async () => {
+  if (firestoreInitialized && db) {
+    await getInitialized();
+    return firestoreInitialized;
+  }
+  return false;
+};
 
 /**
  * Get metadata file path for a user
@@ -55,7 +66,7 @@ const createFile = async (fileData) => {
     downloadCount: 0
   };
 
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     await db.collection(FILES_COLLECTION).doc(newFile.id).set(newFile);
   } else {
     const files = loadUserFiles(fileData.userId);
@@ -70,7 +81,7 @@ const createFile = async (fileData) => {
  * Get file metadata by filename and userId
  */
 const getFileByFilename = async (filename, userId) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const snapshot = await db.collection(FILES_COLLECTION)
       .where('filename', '==', filename)
       .where('userId', '==', userId)
@@ -91,7 +102,7 @@ const getFileByFilename = async (filename, userId) => {
  * Get file metadata by ID
  */
 const getFileById = async (id) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const doc = await db.collection(FILES_COLLECTION).doc(id).get();
     if (!doc.exists) return null;
     return { id: doc.id, ...doc.data() };
@@ -106,7 +117,7 @@ const getFileById = async (id) => {
  * Get all files for a user
  */
 const getUserFiles = async (userId) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const snapshot = await db.collection(FILES_COLLECTION)
       .where('userId', '==', userId)
       .orderBy('createdAt', 'desc')
@@ -123,7 +134,7 @@ const getUserFiles = async (userId) => {
  * Update file download count
  */
 const incrementDownloadCount = async (filename, userId) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const file = await getFileByFilename(filename, userId);
     if (!file) return null;
 
@@ -150,7 +161,7 @@ const incrementDownloadCount = async (filename, userId) => {
  * Delete file metadata
  */
 const deleteFile = async (filename, userId) => {
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const file = await getFileByFilename(filename, userId);
     if (!file) return false;
     await db.collection(FILES_COLLECTION).doc(file.id).delete();
@@ -169,7 +180,7 @@ const deleteFile = async (filename, userId) => {
  */
 const getStorageStats = async (userId) => {
   let files;
-  if (firestoreInitialized && db) {
+  if (await isFirestoreReady()) {
     const snapshot = await db.collection(FILES_COLLECTION)
       .where('userId', '==', userId)
       .get();
