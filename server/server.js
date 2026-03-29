@@ -34,9 +34,9 @@ app.get('/health', (req, res) => {
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 if (require('fs').existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  
-  // SPA fallback
-  app.get('*', (req, res) => {
+
+  // SPA fallback - use regex pattern for wildcard
+  app.get(/.*/, (req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
