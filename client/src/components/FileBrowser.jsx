@@ -532,7 +532,7 @@ function FileBrowser() {
           </div>
         ) : (
           /* Grid View */
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3 mb-20">
           {/* Folders */}
           {folders.map((folder) => (
             <div
@@ -616,7 +616,7 @@ function FileBrowser() {
         )
       ) : (
         /* List View */
-        <div className="bg-slate-800/30 border border-white/5 rounded-xl overflow-visible">
+        <div className="bg-slate-800/30 border border-white/5 rounded-xl overflow-visible mb-20">
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-white/5">
