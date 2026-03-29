@@ -681,46 +681,46 @@ function ApiKeys() {
       {/* New Key Modal */}
       {showKeyModal && newKey && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl">
             {/* Header - Fixed */}
-            <div className="p-5 border-b border-white/5 flex items-center gap-4 flex-shrink-0">
-              <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/25 flex-shrink-0">
-                <FiCheck className="text-white text-2xl" />
+            <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/25 flex-shrink-0">
+                <FiCheck className="text-white text-lg" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-white font-semibold text-base truncate">API Key Created</h3>
-                <p className="text-sm text-slate-500">Store this key securely - it won't be shown again</p>
+                <h3 className="text-white font-semibold text-sm truncate">API Key Created</h3>
+                <p className="text-xs text-slate-500 truncate">Store this key securely</p>
               </div>
             </div>
 
             {/* Content - Scrollable */}
-            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+            <div className="px-4 py-3 space-y-3 overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-2">Your API Key</label>
-                <div className="flex gap-2">
-                  <code className="flex-1 bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-mono break-all">
+                <label className="block text-[10px] font-medium text-slate-400 mb-1.5">Your API Key</label>
+                <div className="flex gap-1.5">
+                  <code className="flex-1 bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono break-all">
                     {newKey.key}
                   </code>
                   <button
                     onClick={() => copyToClipboard(newKey.key)}
-                    className={`px-4 rounded-xl transition-all flex items-center justify-center flex-shrink-0 ${
+                    className={`px-3 rounded-lg transition-all flex items-center justify-center flex-shrink-0 ${
                       copied
                         ? 'bg-green-500 text-white'
                         : 'bg-indigo-500 hover:bg-indigo-600 text-white'
                     }`}
                   >
-                    {copied ? <FiCheck className="text-lg" /> : <FiCopy className="text-lg" />}
+                    {copied ? <FiCheck className="text-base" /> : <FiCopy className="text-base" />}
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-2">Permissions</label>
-                <div className="flex gap-2 flex-wrap">
+                <label className="block text-[10px] font-medium text-slate-400 mb-1.5">Permissions</label>
+                <div className="flex gap-1.5 flex-wrap">
                   {newKey.permissions.map((perm) => (
                     <span
                       key={perm}
-                      className={`px-3 py-1.5 text-xs rounded-lg font-medium bg-gradient-to-r ${getPermissionColor(perm)} text-white`}
+                      className={`px-2 py-1 text-[10px] rounded-md font-medium bg-gradient-to-r ${getPermissionColor(perm)} text-white`}
                     >
                       {perm.replace('_', ' ')}
                     </span>
@@ -729,28 +729,28 @@ function ApiKeys() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-2">Quick Test</label>
-                <div className="flex gap-2">
-                  <code className="flex-1 bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-slate-300 text-xs font-mono overflow-x-auto">
-                    curl -H "Authorization: Bearer {newKey.key.slice(0, 24)}..." http://localhost:3000/api/files
+                <label className="block text-[10px] font-medium text-slate-400 mb-1.5">Quick Test</label>
+                <div className="flex gap-1.5">
+                  <code className="flex-1 bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-300 text-[10px] font-mono overflow-x-auto">
+                    curl -H "Authorization: Bearer {newKey.key.slice(0, 20)}..." http://localhost:3000/api/files
                   </code>
                   <button
                     onClick={() => copyToClipboard(`curl -H "Authorization: Bearer ${newKey.key}" http://localhost:3000/api/files`)}
-                    className={`px-3 rounded-xl transition-all flex items-center justify-center flex-shrink-0 ${
+                    className={`px-2.5 rounded-lg transition-all flex items-center justify-center flex-shrink-0 ${
                       copied
                         ? 'bg-green-500 text-white'
                         : 'bg-slate-700 hover:bg-slate-600 text-white'
                     }`}
-                    title="Copy full curl command"
+                    title="Copy curl command"
                   >
-                    {copied ? <FiCheck className="text-lg" /> : <FiCopy className="text-lg" />}
+                    {copied ? <FiCheck className="text-base" /> : <FiCopy className="text-base" />}
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Footer - Fixed */}
-            <div className="p-5 border-t border-white/5 flex justify-end gap-3 flex-shrink-0">
+            <div className="px-4 py-3 border-t border-white/5 flex justify-end gap-2 flex-shrink-0">
               <button
                 onClick={() => {
                   setShowKeyModal(false);
@@ -759,14 +759,14 @@ function ApiKeys() {
                   setExampleIdx(0);
                   setShowCodeModal(true);
                 }}
-                className="px-5 py-2.5 text-indigo-400 hover:bg-indigo-500/10 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+                className="px-4 py-2 text-indigo-400 hover:bg-indigo-500/10 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5"
               >
-                <FiCode className="text-base" />
-                More Examples
+                <FiCode className="text-sm" />
+                Examples
               </button>
               <button
                 onClick={() => setShowKeyModal(false)}
-                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-xs font-medium transition-all shadow-lg shadow-indigo-500/25"
               >
                 Done
               </button>
