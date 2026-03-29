@@ -79,6 +79,9 @@ function FileBrowser() {
   const [previewIndex, setPreviewIndex] = useState(0);
   const [previewFiles, setPreviewFiles] = useState([]);
   const [zoom, setZoom] = useState(1);
+  const [thumbnailUrls, setThumbnailUrls] = useState({});
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Modal state
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
@@ -105,6 +108,61 @@ function FileBrowser() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Load preview image when index changes
+  useEffect(() => {
+    if (previewOpen && previewFiles.length > 0 && previewIndex >= 0) {
+      const loadCurrentPreview = async () => {
+        setPreviewLoading(true);
+        const file = previewFiles[previewIndex];
+        
+        // Clean up old URL
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+        }
+        
+        const url = await getPreviewUrl(file);
+        setPreviewUrl(url);
+        setPreviewLoading(false);
+      };
+
+      loadCurrentPreview();
+    }
+
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewIndex, previewOpen, previewFiles]);
+
+  // Load thumbnails for images
+  useEffect(() => {
+    const loadThumbnails = async () => {
+      const imageFiles = files.filter(f => f.mimetype?.includes('image'));
+      const urls = {};
+      
+      for (const file of imageFiles) {
+        const url = await getPreviewUrl(file);
+        if (url) {
+          urls[file.id || file.filename] = url;
+        }
+      }
+      
+      setThumbnailUrls(urls);
+    };
+
+    if (files.length > 0) {
+      loadThumbnails();
+    }
+
+    // Cleanup URLs on unmount
+    return () => {
+      Object.values(thumbnailUrls).forEach(url => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, [files]);
 
   // Save view preference to localStorage
   useEffect(() => {
@@ -372,10 +430,30 @@ function FileBrowser() {
     setZoom(1);
   };
 
-  // Get preview URL
-  const getPreviewUrl = (file) => {
+  // Get preview URL with auth token
+  const getPreviewUrl = async (file) => {
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    return `${API_BASE}/api/download/${encodeURIComponent(file.filename)}`;
+    try {
+      const response = await fetch(`${API_BASE}/api/download/${encodeURIComponent(file.filename)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        return URL.createObjectURL(blob);
+      }
+    } catch (error) {
+      console.error('Error loading preview:', error);
+    }
+    return null;
+  };
+
+  // Load preview image
+  const loadPreviewImage = async (file) => {
+    const url = await getPreviewUrl(file);
+    if (url) {
+      return url;
+    }
+    return null;
   };
 
   // Loading skeleton
@@ -647,16 +725,24 @@ function FileBrowser() {
                 {/* Thumbnail for images */}
                 {isImage ? (
                   <div className="w-full h-32 mt-2 px-2 relative overflow-hidden rounded-lg">
-                    <img
-                      src={getPreviewUrl(file)}
-                      alt={file.originalname || file.filename}
-                      className="w-full h-full object-cover rounded-lg group-hover:scale-110 transition-transform duration-300"
-                      loading="lazy"
-                    />
-                    {/* Preview indicator */}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      <FiZoomIn className="text-white text-xl" />
-                    </div>
+                    {thumbnailUrls[file.id || file.filename] ? (
+                      <>
+                        <img
+                          src={thumbnailUrls[file.id || file.filename]}
+                          alt={file.originalname || file.filename}
+                          className="w-full h-full object-cover rounded-lg group-hover:scale-110 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                        {/* Preview indicator */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <FiZoomIn className="text-white text-xl" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className={`w-12 h-12 mt-2 ${fileIcon.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
@@ -1081,19 +1167,31 @@ function FileBrowser() {
               /* PDF Preview */
               <div className="w-full h-full max-w-4xl">
                 <iframe
-                  src={getPreviewUrl(previewFiles[previewIndex])}
+                  src={previewUrl || ''}
                   className="w-full h-[80vh] rounded-lg"
                   title="PDF Preview"
                 />
               </div>
-            ) : (
+            ) : previewLoading ? (
+              /* Loading state */
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-white text-sm">Loading preview...</p>
+              </div>
+            ) : previewUrl ? (
               /* Image Preview */
               <img
-                src={getPreviewUrl(previewFiles[previewIndex])}
+                src={previewUrl}
                 alt={previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
                 className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl transition-transform duration-200"
                 style={{ transform: `scale(${zoom})` }}
               />
+            ) : (
+              /* Error state */
+              <div className="text-center text-slate-400">
+                <FiX className="text-4xl mb-2" />
+                <p>Failed to load preview</p>
+              </div>
             )}
           </div>
 
