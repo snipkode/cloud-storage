@@ -549,14 +549,15 @@ function ApiKeys() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="modal-content max-w-lg w-full">
-            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+            {/* Header - Fixed */}
+            <div className="p-5 border-b border-white/5 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
                   <FiKey className="text-white text-lg" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold">Create API Key</h3>
+                  <h3 className="text-white font-semibold text-base">Create API Key</h3>
                   <p className="text-xs text-slate-500">Configure access permissions</p>
                 </div>
               </div>
@@ -565,7 +566,8 @@ function ApiKeys() {
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
+            {/* Content - Scrollable */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-2">
                   <FiShield className="inline-block mr-1.5 text-indigo-400" />
@@ -582,24 +584,24 @@ function ApiKeys() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-3">
+                <label className="block text-sm font-medium text-slate-400 mb-2">
                   <FiLock className="inline-block mr-1.5 text-indigo-400" />
                   Permissions
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {PERMISSION_LEVELS.map((level) => {
                     const isSelected = (level.id === 'admin' && selectedPermissions.includes('admin')) ||
                       (level.id !== 'admin' && level.permissions.every(p => selectedPermissions.includes(p)));
                     return (
                       <label
                         key={level.id}
-                        className={`p-4 rounded-xl border cursor-pointer transition-all hover-lift ${
+                        className={`p-3 rounded-xl border cursor-pointer transition-all hover-lift ${
                           isSelected
                             ? 'bg-indigo-500/10 border-indigo-500/30 ring-2 ring-indigo-500/20'
                             : 'bg-slate-800/30 border-white/5 hover:border-white/10'
                         }`}
                       >
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-start gap-2">
                           <input
                             type="radio"
                             name="permission"
@@ -607,12 +609,12 @@ function ApiKeys() {
                             onChange={() => setSelectedPermissions(level.permissions)}
                             className="w-4 h-4 text-indigo-500 accent-indigo-500 mt-0.5"
                           />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-lg">{level.icon}</span>
-                              <span className="text-white font-medium text-sm">{level.name}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-base">{level.icon}</span>
+                              <span className="text-white font-medium text-xs">{level.name}</span>
                             </div>
-                            <p className="text-xs text-slate-500">{level.description}</p>
+                            <p className="text-[10px] text-slate-500 leading-tight">{level.description}</p>
                           </div>
                         </div>
                       </label>
@@ -622,7 +624,7 @@ function ApiKeys() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-3">
+                <label className="block text-sm font-medium text-slate-400 mb-2">
                   <FiClock className="inline-block mr-1.5 text-indigo-400" />
                   Expiration
                 </label>
@@ -636,7 +638,7 @@ function ApiKeys() {
                     <button
                       key={opt.value || 'never'}
                       onClick={() => setExpiresIn(opt.value)}
-                      className={`py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      className={`py-2 rounded-lg text-xs font-medium transition-all ${
                         expiresIn === opt.value
                           ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
                           : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
@@ -648,16 +650,17 @@ function ApiKeys() {
                 </div>
               </div>
 
-              <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
-                <div className="text-xl">⚠️</div>
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 flex items-start gap-3">
+                <div className="text-lg flex-shrink-0">⚠️</div>
                 <div>
-                  <p className="text-amber-400 text-sm font-medium mb-1">Important</p>
-                  <p className="text-amber-400/70 text-xs">The API key will only be shown once. Make sure to copy and store it securely.</p>
+                  <p className="text-amber-400 text-xs font-medium mb-0.5">Important</p>
+                  <p className="text-amber-400/70 text-[10px] leading-relaxed">The API key will only be shown once. Make sure to copy and store it securely.</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 border-t border-white/5 flex justify-end gap-3">
+            {/* Footer - Fixed */}
+            <div className="p-5 border-t border-white/5 flex justify-end gap-3 flex-shrink-0">
               <button
                 onClick={() => setShowCreateModal(false)}
                 className="px-5 py-2.5 text-slate-400 hover:text-white text-sm font-medium rounded-xl hover:bg-white/5 transition-all"
@@ -678,20 +681,20 @@ function ApiKeys() {
       {/* New Key Modal */}
       {showKeyModal && newKey && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="modal-content max-w-lg w-full">
-            <div className="p-6 border-b border-white/5">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/25">
-                  <FiCheck className="text-white text-2xl" />
-                </div>
-                <div>
-                  <h3 className="text-white font-semibold text-lg">API Key Created</h3>
-                  <p className="text-sm text-slate-500">Store this key securely - it won't be shown again</p>
-                </div>
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+            {/* Header - Fixed */}
+            <div className="p-5 border-b border-white/5 flex items-center gap-4 flex-shrink-0">
+              <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/25 flex-shrink-0">
+                <FiCheck className="text-white text-2xl" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-white font-semibold text-base truncate">API Key Created</h3>
+                <p className="text-sm text-slate-500">Store this key securely - it won't be shown again</p>
               </div>
             </div>
 
-            <div className="p-6 space-y-5">
+            {/* Content - Scrollable */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-2">Your API Key</label>
                 <div className="flex gap-2">
@@ -700,7 +703,7 @@ function ApiKeys() {
                   </code>
                   <button
                     onClick={() => copyToClipboard(newKey.key)}
-                    className={`px-4 rounded-xl transition-all flex items-center justify-center ${
+                    className={`px-4 rounded-xl transition-all flex items-center justify-center flex-shrink-0 ${
                       copied
                         ? 'bg-green-500 text-white'
                         : 'bg-indigo-500 hover:bg-indigo-600 text-white'
@@ -711,15 +714,18 @@ function ApiKeys() {
                 </div>
               </div>
 
-              <div className="flex gap-2 flex-wrap">
-                {newKey.permissions.map((perm) => (
-                  <span
-                    key={perm}
-                    className={`px-3 py-1.5 text-xs rounded-lg font-medium bg-gradient-to-r ${getPermissionColor(perm)} text-white`}
-                  >
-                    {perm.replace('_', ' ')}
-                  </span>
-                ))}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-2">Permissions</label>
+                <div className="flex gap-2 flex-wrap">
+                  {newKey.permissions.map((perm) => (
+                    <span
+                      key={perm}
+                      className={`px-3 py-1.5 text-xs rounded-lg font-medium bg-gradient-to-r ${getPermissionColor(perm)} text-white`}
+                    >
+                      {perm.replace('_', ' ')}
+                    </span>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -743,7 +749,8 @@ function ApiKeys() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-white/5 flex justify-end gap-3">
+            {/* Footer - Fixed */}
+            <div className="p-5 border-t border-white/5 flex justify-end gap-3 flex-shrink-0">
               <button
                 onClick={() => {
                   setShowKeyModal(false);
@@ -771,9 +778,9 @@ function ApiKeys() {
       {/* Code Examples Modal - Compact */}
       {showCodeModal && selectedKey && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
-          <div className="modal-content max-w-2xl w-full max-h-[85vh] flex flex-col">
-            {/* Header - Compact */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
+            {/* Header - Fixed */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 flex-shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
                   selectedKey.active ? 'bg-indigo-500/20 border border-indigo-500/30' : 'bg-slate-800/50 border border-slate-700/50'
@@ -803,9 +810,9 @@ function ApiKeys() {
               </button>
             </div>
 
-            {/* Key Display - Compact */}
+            {/* Key Display - Fixed */}
             {selectedKey.key && (
-              <div className="px-4 py-2.5 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border-b border-indigo-500/10">
+              <div className="px-4 py-2.5 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border-b border-indigo-500/10 flex-shrink-0">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <FiKey className="text-indigo-400 text-[10px]" />
@@ -829,8 +836,8 @@ function ApiKeys() {
               </div>
             )}
 
-            {/* Stats & Permissions - Compact */}
-            <div className="px-4 py-2.5 border-b border-white/5">
+            {/* Stats & Permissions - Fixed */}
+            <div className="px-4 py-2.5 border-b border-white/5 flex-shrink-0">
               <div className="flex items-center gap-4 flex-wrap text-[10px] text-slate-500">
                 <span className="flex items-center gap-1">
                   <FiActivity className="text-[10px]" />
@@ -858,10 +865,10 @@ function ApiKeys() {
               </div>
             </div>
 
-            {/* Code Examples - Compact */}
-            <div className="flex-1 overflow-hidden flex flex-col min-h-[200px]">
+            {/* Code Examples - Scrollable */}
+            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
               {/* Language Tabs */}
-              <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-800/30 border-b border-white/5 overflow-x-auto">
+              <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-800/30 border-b border-white/5 overflow-x-auto flex-shrink-0">
                 {Object.entries(CODE_EXAMPLES).map(([key, lang]) => (
                   <button
                     key={key}
@@ -882,7 +889,7 @@ function ApiKeys() {
               </div>
 
               {/* Example Sub-tabs */}
-              <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/20 border-b border-white/5 overflow-x-auto">
+              <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/20 border-b border-white/5 overflow-x-auto flex-shrink-0">
                 {CODE_EXAMPLES[codeLang].examples.map((ex, idx) => (
                   <button
                     key={idx}
@@ -898,9 +905,9 @@ function ApiKeys() {
                 ))}
               </div>
 
-              {/* Code Display with Copy - Compact */}
-              <div className="flex-1 overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between px-3 py-2 bg-slate-800/30 border-b border-white/5">
+              {/* Code Display with Copy - Scrollable */}
+              <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-3 py-2 bg-slate-800/30 border-b border-white/5 flex-shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-slate-400">Example:</span>
                     <span className="text-[10px] font-medium text-white bg-slate-700/50 px-1.5 py-0.5 rounded">
@@ -922,7 +929,7 @@ function ApiKeys() {
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
-                <div className="flex-1 overflow-auto bg-[#1e1e2e] p-3">
+                <div className="flex-1 overflow-auto bg-[#1e1e2e] p-3 min-h-0">
                   <pre className="text-[10px] font-mono text-slate-300 leading-relaxed whitespace-pre-wrap">
                     <code>
                       {CODE_EXAMPLES[codeLang].examples[exampleIdx].code.replace('{{API_KEY}}', selectedKey.key || 'YOUR_API_KEY')}
@@ -932,8 +939,8 @@ function ApiKeys() {
               </div>
             </div>
 
-            {/* Footer - Compact */}
-            <div className="flex items-center justify-between px-4 py-3 bg-slate-800/30 border-t border-white/5">
+            {/* Footer - Fixed */}
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-800/30 border-t border-white/5 flex-shrink-0">
               <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
                 Ready to use
