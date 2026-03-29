@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   FiGrid, FiList, FiPlus, FiSearch, FiMoreVertical, FiDownload,
   FiTrash2, FiFolder, FiX, FiUpload, FiCheck, FiCloud, FiFile,
-  FiImage, FiFilm, FiMusic, FiCode, FiSettings, FiBook, FiBarChart
+  FiImage, FiFilm, FiMusic, FiCode, FiSettings, FiBook, FiBarChart, FiInfo
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useFilesStore } from '@store/filesStore';
@@ -784,20 +784,37 @@ function FileBrowser() {
         </div>
       )}
 
-      {/* Upload Modal */}
+      {/* Upload Modal - Modern Design */}
       {uploadModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 rounded-2xl border border-white/10 max-w-md w-full">
-            <div className="p-5 border-b border-white/5 flex items-center justify-between">
-              <h3 className="text-white font-semibold">Upload Files</h3>
-              <button onClick={() => setUploadModalOpen(false)} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-all">
-                <FiX className="text-lg" />
-              </button>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 rounded-3xl border border-white/10 max-w-md w-full shadow-2xl animate-scale-in">
+            {/* Header */}
+            <div className="relative p-6 border-b border-white/5 overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10"></div>
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <FiUpload className="text-white text-xl" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold text-lg">Upload Files</h3>
+                    <p className="text-xs text-slate-400">Add files to your cloud storage</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setUploadModalOpen(false)}
+                  className="p-2 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all"
+                >
+                  <FiX className="text-xl" />
+                </button>
+              </div>
             </div>
-            <div className="p-5">
+
+            {/* Drop Zone */}
+            <div className="p-6">
               <label className="block cursor-pointer">
                 <div
-                  className="border-2 border-dashed border-slate-700 hover:border-indigo-500/50 rounded-xl p-8 text-center transition-all hover:bg-slate-800/30"
+                  className="group relative border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-8 text-center transition-all duration-300 hover:bg-slate-800/50 hover:shadow-xl hover:shadow-indigo-500/10"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -808,11 +825,45 @@ function FileBrowser() {
                     }
                   }}
                 >
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center">
-                    <FiUpload className="text-3xl text-indigo-400" />
+                  {/* Animated Icon */}
+                  <div className="relative mb-4">
+                    <div className="w-20 h-20 mx-auto bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                      <FiUpload className="text-4xl text-indigo-400 group-hover:text-indigo-300 transition-colors" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
+                      <FiPlus className="text-white text-xs" />
+                    </div>
                   </div>
-                  <p className="text-white font-medium mb-1">Click to select files</p>
-                  <p className="text-xs text-slate-500">or drag and drop here</p>
+
+                  {/* Text */}
+                  <p className="text-white font-semibold mb-1.5 group-hover:text-indigo-300 transition-colors">
+                    Click to browse files
+                  </p>
+                  <p className="text-xs text-slate-400 mb-3">
+                    or drag and drop files here
+                  </p>
+
+                  {/* Supported Formats */}
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    <span className="px-2 py-1 bg-slate-800 rounded-md text-[10px] text-slate-500 border border-white/5">
+                      Images
+                    </span>
+                    <span className="px-2 py-1 bg-slate-800 rounded-md text-[10px] text-slate-500 border border-white/5">
+                      Videos
+                    </span>
+                    <span className="px-2 py-1 bg-slate-800 rounded-md text-[10px] text-slate-500 border border-white/5">
+                      Docs
+                    </span>
+                    <span className="px-2 py-1 bg-slate-800 rounded-md text-[10px] text-slate-500 border border-white/5">
+                      PDFs
+                    </span>
+                  </div>
+
+                  {/* Max Size */}
+                  <p className="text-[10px] text-slate-500 mt-4 flex items-center justify-center gap-1">
+                    <FiInfo className="text-xs" />
+                    Max 50MB per file
+                  </p>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -823,6 +874,16 @@ function FileBrowser() {
                   accept="*/*"
                 />
               </label>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6">
+              <div className="bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-pink-500/5 rounded-xl p-4 border border-white/5">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span>Secure upload with encryption</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
