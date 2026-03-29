@@ -106,6 +106,33 @@ const revokeApiKey = async (id, userId) => {
 };
 
 /**
+ * Reactivate API key (reverse revoke)
+ */
+const reactivateApiKey = async (id, userId) => {
+  const apiKey = await getApiKeyById(id);
+
+  if (!apiKey || apiKey.userId !== userId) return false;
+
+  await db.collection(API_KEYS_COLLECTION).doc(id).update({ active: true });
+
+  return true;
+};
+
+/**
+ * Toggle API key active status
+ */
+const toggleApiKeyStatus = async (id, userId) => {
+  const apiKey = await getApiKeyById(id);
+
+  if (!apiKey || apiKey.userId !== userId) return null;
+
+  const newStatus = !apiKey.active;
+  await db.collection(API_KEYS_COLLECTION).doc(id).update({ active: newStatus });
+
+  return { id, active: newStatus };
+};
+
+/**
  * Delete API key
  */
 const deleteApiKey = async (id, userId) => {
@@ -143,6 +170,8 @@ module.exports = {
   getUserApiKeys,
   updateApiKeyUsage,
   revokeApiKey,
+  reactivateApiKey,
+  toggleApiKeyStatus,
   deleteApiKey,
   hasPermission,
   isExpired

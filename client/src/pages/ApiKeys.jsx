@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   FiKey, FiPlus, FiTrash2, FiLock, FiCopy, FiCheck,
   FiX, FiActivity, FiCode, FiSearch, FiXCircle,
-  FiBook, FiShield, FiClock, FiServer
+  FiBook, FiShield, FiClock, FiServer, FiUnlock
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import ApiIntegrationPreview from '@components/ApiIntegrationPreview';
@@ -233,6 +233,44 @@ function ApiKeys() {
       }
     } catch {
       setError('Failed to revoke API key');
+    }
+  };
+
+  const handleReactivate = async (id) => {
+    if (!confirm('Reactivate this API key? The key will be usable again.')) return;
+    try {
+      const res = await fetch(`/api/api-keys/${id}/reactivate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        loadApiKeys();
+        setSuccess('API key reactivated');
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError('Failed to reactivate API key');
+      }
+    } catch {
+      setError('Failed to reactivate API key');
+    }
+  };
+
+  const handleToggle = async (id) => {
+    try {
+      const res = await fetch(`/api/api-keys/${id}/toggle`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        loadApiKeys();
+        const data = await res.json();
+        setSuccess(data.message);
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError('Failed to toggle API key');
+      }
+    } catch {
+      setError('Failed to toggle API key');
     }
   };
 
@@ -526,18 +564,24 @@ function ApiKeys() {
                   >
                     <FiCode className="text-sm" />
                   </button>
-                  {key.active && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRevoke(key.id);
-                      }}
-                      className="p-2 text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 rounded-lg transition-all"
-                      title="Revoke"
-                    >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggle(key.id);
+                    }}
+                    className={`p-2 rounded-lg transition-all ${
+                      key.active
+                        ? 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10'
+                        : 'text-slate-400 hover:text-green-400 hover:bg-green-500/10'
+                    }`}
+                    title={key.active ? 'Revoke' : 'Reactivate'}
+                  >
+                    {key.active ? (
                       <FiLock className="text-sm" />
-                    </button>
-                  )}
+                    ) : (
+                      <FiUnlock className="text-sm" />
+                    )}
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

@@ -100,9 +100,15 @@ router.get('/', authMiddleware, async (req, res) => {
   try {
     const apiKeys = await apiKeyStore.getUserApiKeys(req.user.uid);
 
+    // Map API keys to include environment info from key prefix
+    const mappedKeys = apiKeys.map(key => ({
+      ...key,
+      environment: key.key?.startsWith('cs_test_') ? 'test' : 'live'
+    }));
+
     res.json({
-      apiKeys,
-      total: apiKeys.length
+      apiKeys: mappedKeys,
+      total: mappedKeys.length
     });
   } catch (error) {
     console.error('List API keys error:', error);
@@ -245,6 +251,65 @@ router.post('/:id/revoke', authMiddleware, async (req, res) => {
     console.error('Revoke API key error:', error);
     res.status(500).json({
       error: 'Failed to revoke API key',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Reactivate API key (reverse revoke)
+ * POST /api/api-keys/:id/reactivate
+ */
+router.post('/:id/reactivate', authMiddleware, async (req, res) => {
+  try {
+    const success = await apiKeyStore.reactivateApiKey(req.params.id, req.user.uid);
+
+    if (!success) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'API key not found'
+      });
+    }
+
+    res.json({
+      message: 'API key reactivated successfully',
+      apiKey: {
+        id: req.params.id,
+        active: true
+      }
+    });
+  } catch (error) {
+    console.error('Reactivate API key error:', error);
+    res.status(500).json({
+      error: 'Failed to reactivate API key',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Toggle API key active status
+ * POST /api/api-keys/:id/toggle
+ */
+router.post('/:id/toggle', authMiddleware, async (req, res) => {
+  try {
+    const result = await apiKeyStore.toggleApiKeyStatus(req.params.id, req.user.uid);
+
+    if (!result) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'API key not found'
+      });
+    }
+
+    res.json({
+      message: `API key ${result.active ? 'activated' : 'revoked'} successfully`,
+      apiKey: result
+    });
+  } catch (error) {
+    console.error('Toggle API key error:', error);
+    res.status(500).json({
+      error: 'Failed to toggle API key',
       message: error.message
     });
   }
