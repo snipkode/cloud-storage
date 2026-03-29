@@ -295,16 +295,17 @@ function ApiKeys() {
     <div className="space-y-4">
       {/* Action Bar */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
+        <div>
           <h1 className="text-white font-semibold text-lg">API Keys</h1>
-          <button
-            onClick={() => setShowIntegrationPreview(true)}
-            className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-all"
-          >
-            <FiBook className="text-indigo-400" />
-            <span>API Docs</span>
-          </button>
+          <p className="text-xs text-slate-500 mt-0.5">Manage access and integrations</p>
         </div>
+        <button
+          onClick={() => setShowIntegrationPreview(true)}
+          className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-all"
+        >
+          <FiBook className="text-indigo-400" />
+          <span>API Docs</span>
+        </button>
         <button
           onClick={() => setShowCreateModal(true)}
           className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"

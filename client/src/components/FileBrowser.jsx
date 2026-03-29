@@ -306,10 +306,15 @@ function FileBrowser() {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 flex-1">
-          <h1 className="text-white font-semibold text-lg">
-            {currentFolder ? (currentFolder.originalname || currentFolder.name) : 'All Files'}
-          </h1>
-          <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-full">
+          <div>
+            <h1 className="text-white font-semibold text-lg">
+              {currentFolder ? (currentFolder.originalname || currentFolder.name) : 'All Files'}
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {currentFolder ? 'Browse folder contents' : 'Manage and organize your files'}
+            </p>
+          </div>
+          <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-full hidden sm:inline">
             {folders.length + fileList.length} items
           </span>
         </div>
