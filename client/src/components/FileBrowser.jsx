@@ -686,17 +686,17 @@ function FileBrowser() {
 
             {/* Empty state */}
             {filteredFiles.length === 0 && (
-              <div className="p-12 text-center">
-                <div className="text-6xl mb-4" aria-hidden="true">📂</div>
-                <p className="text-gray-400 text-sm mb-4">
+              <div className="p-8 text-center">
+                <div className="text-5xl mb-3" aria-hidden="true">📂</div>
+                <p className="text-gray-400 text-xs mb-3">
                   {debouncedSearch ? 'No files match your search' : 'This folder is empty'}
                 </p>
                 {!debouncedSearch && (
                   <button
                     onClick={() => setUploadModalOpen(true)}
-                    className="text-purple-400 hover:text-purple-300 text-sm font-medium inline-flex items-center gap-2"
+                    className="text-purple-400 hover:text-purple-300 text-xs font-medium inline-flex items-center gap-1.5"
                   >
-                    <FiUpload className="text-xs" />
+                    <FiUpload className="text-[10px]" />
                     Upload your first file
                   </button>
                 )}
@@ -707,13 +707,13 @@ function FileBrowser() {
       </div>
 
       {/* Status Bar */}
-      <div className="px-4 py-2 border-t border-white/10 bg-slate-800/50 flex items-center justify-between text-xs text-gray-400" role="status">
+      <div className="px-3 py-1.5 border-t border-white/10 bg-slate-800/50 flex items-center justify-between text-[10px] text-gray-400" role="status">
         <span>
           {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
           {selectedFiles.length > 0 && ` • ${selectedFiles.length} selected`}
         </span>
         {selectedFiles.length > 0 && (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <span>{formatSize(selectedSize)}</span>
             <button
               onClick={() => setSelectedFiles([])}
@@ -735,17 +735,17 @@ function FileBrowser() {
       {/* Upload Modal */}
       {uploadModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
-          <div className="bg-slate-900 rounded-xl border border-white/10 max-w-md w-full">
-            <div className="p-5 border-b border-white/10 flex items-center justify-between">
-              <h3 id="upload-modal-title" className="text-white font-semibold">Upload Files</h3>
+          <div className="bg-slate-900 rounded-xl border border-white/10 max-w-sm w-full">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <h3 id="upload-modal-title" className="text-white font-semibold text-sm">Upload Files</h3>
               <button onClick={() => setUploadModalOpen(false)} className="text-gray-400 hover:text-white p-1" aria-label="Close upload modal">
-                <FiX className="text-lg" />
+                <FiX className="text-base" />
               </button>
             </div>
-            <div className="p-5">
+            <div className="p-4">
               <label className="block cursor-pointer">
-                <div 
-                  className="border-2 border-dashed border-white/20 hover:border-purple-500/50 rounded-xl p-8 text-center transition-colors"
+                <div
+                  className="border-2 border-dashed border-white/20 hover:border-purple-500/50 rounded-lg p-6 text-center transition-colors"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -756,10 +756,10 @@ function FileBrowser() {
                     }
                   }}
                 >
-                  <FiUpload className="text-4xl text-gray-400 mx-auto mb-3" aria-hidden="true" />
-                  <p className="text-white font-medium">Click to select files</p>
-                  <p className="text-xs text-gray-500 mt-1">or drag and drop here</p>
-                  <p className="text-xs text-gray-600 mt-2">Max 50MB per file</p>
+                  <FiUpload className="text-3xl text-gray-400 mx-auto mb-2" aria-hidden="true" />
+                  <p className="text-white font-medium text-sm">Click to select files</p>
+                  <p className="text-xs text-gray-500 mt-0.5">or drag and drop here</p>
+                  <p className="text-xs text-gray-600 mt-1">Max 50MB per file</p>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -779,41 +779,41 @@ function FileBrowser() {
       {/* New Folder Modal */}
       {showNewFolderModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="folder-modal-title">
-          <div className="bg-slate-900 rounded-xl border border-white/10 max-w-md w-full">
-            <div className="p-5 border-b border-white/10 flex items-center justify-between">
-              <h3 id="folder-modal-title" className="text-white font-semibold">New Folder</h3>
+          <div className="bg-slate-900 rounded-xl border border-white/10 max-w-sm w-full">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <h3 id="folder-modal-title" className="text-white font-semibold text-sm">New Folder</h3>
               <button onClick={() => setShowNewFolderModal(false)} className="text-gray-400 hover:text-white p-1" aria-label="Close new folder modal">
-                <FiX className="text-lg" />
+                <FiX className="text-base" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-4 space-y-3">
               <div>
-                <label htmlFor="folder-name" className="block text-sm text-gray-400 mb-2">Folder Name</label>
+                <label htmlFor="folder-name" className="block text-xs text-gray-400 mb-1.5">Folder Name</label>
                 <input
                   id="folder-name"
                   type="text"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
                   placeholder="Enter folder name"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50"
                   autoFocus
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
                 />
               </div>
             </div>
-            <div className="p-5 border-t border-white/10 flex justify-end gap-2">
+            <div className="p-4 border-t border-white/10 flex justify-end gap-2">
               <button
                 onClick={() => setShowNewFolderModal(false)}
-                className="px-4 py-2 text-gray-400 hover:text-white text-sm"
+                className="px-3 py-1.5 text-gray-400 hover:text-white text-xs"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim() || isCreatingFolder}
-                className="bg-purple-500 hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                className="bg-purple-500 hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
               >
-                {isCreatingFolder && <FiCheck className="text-xs animate-spin" />}
+                {isCreatingFolder && <FiCheck className="text-[10px] animate-spin" />}
                 Create
               </button>
             </div>
@@ -825,51 +825,51 @@ function FileBrowser() {
       {contextMenu && (
         <div
           ref={contextMenuRef}
-          className="fixed bg-slate-800 border border-white/10 rounded-lg shadow-xl py-1 z-50 min-w-[180px]"
+          className="fixed bg-slate-800 border border-white/10 rounded-lg shadow-xl py-1 z-50 min-w-[160px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           role="menu"
           aria-label="File actions"
         >
           <button
             onClick={() => handleDownload(contextMenu.item)}
-            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
             role="menuitem"
           >
-            <FiDownload className="text-xs" aria-hidden="true" />
+            <FiDownload className="text-[10px]" aria-hidden="true" />
             Download
           </button>
           <button
             onClick={() => setContextMenu(null)}
-            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
             role="menuitem"
           >
-            <FiEdit2 className="text-xs" aria-hidden="true" />
+            <FiEdit2 className="text-[10px]" aria-hidden="true" />
             Rename
           </button>
           <button
             onClick={() => setContextMenu(null)}
-            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
             role="menuitem"
           >
-            <FiCopy className="text-xs" aria-hidden="true" />
+            <FiCopy className="text-[10px]" aria-hidden="true" />
             Copy
           </button>
           <button
             onClick={() => setContextMenu(null)}
-            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
             role="menuitem"
           >
-            <FiScissors className="text-xs" aria-hidden="true" />
+            <FiScissors className="text-[10px]" aria-hidden="true" />
             Move to
           </button>
           <div className="border-t border-white/10 my-1" role="separator"></div>
           <button
             onClick={() => handleDelete(contextMenu.item)}
             disabled={isDeleting}
-            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors disabled:opacity-50"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors disabled:opacity-50"
             role="menuitem"
           >
-            <FiTrash2 className="text-xs" aria-hidden="true" />
+            <FiTrash2 className="text-[10px]" aria-hidden="true" />
             {isDeleting ? 'Deleting...' : 'Delete'}
           </button>
         </div>

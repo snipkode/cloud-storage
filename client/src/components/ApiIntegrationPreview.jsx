@@ -950,24 +950,24 @@ function ApiIntegrationPreview({ onClose }) {
   const currentLang = LANGUAGES[selectedLang];
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
       <div className="bg-slate-900 rounded-xl border border-white/10 w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <FiCode className="text-white text-sm" />
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-purple-500/20">
+              <FiCode className="text-white text-xs" />
             </div>
             <div>
-              <h2 className="text-white font-semibold text-sm">API Integration</h2>
+              <h2 className="text-white font-semibold text-xs">API Integration</h2>
               <p className="text-[10px] text-gray-400">Quick start guide</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-all"
+            className="text-gray-400 hover:text-white p-1.5 hover:bg-white/10 rounded-lg transition-all"
           >
-            <FiX className="text-base" />
+            <FiX className="text-sm" />
           </button>
         </div>
 
@@ -984,13 +984,13 @@ function ApiIntegrationPreview({ onClose }) {
                     setSelectedCategory(cat.id);
                     setSelectedEndpoint(null);
                   }}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-medium transition-all ${
                     selectedCategory === cat.id
                       ? 'bg-purple-500/10 text-purple-400 border-b-2 border-purple-500'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <Icon className="text-sm" />
+                  <Icon className="text-xs" />
                   <span className="hidden sm:inline">{cat.name}</span>
                 </button>
               );
