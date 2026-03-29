@@ -98,7 +98,9 @@ const apiKeyMiddleware = async (req, res, next) => {
       apiKeyId: apiKeyRecord.id,
       apiKeyName: apiKeyRecord.name,
       permissions: apiKeyRecord.permissions,
-      environment: apiKey.startsWith('cs_test_') ? 'test' : 'live'
+      environment: apiKey.startsWith('cs_test_') ? 'test' : 'live',
+      active: apiKeyRecord.active,
+      expiresAt: apiKeyRecord.expiresAt
     };
 
     // Store the required permission for this route
@@ -127,17 +129,7 @@ const requirePermission = (permission) => {
 
     // If authenticated via API key, check permissions
     if (req.user && req.user.authMethod === 'api-key') {
-      const userPerms = req.user.permissions || [];
       const hasPerm = apiKeyStore.hasPermission(req.user, permission);
-      
-      // Debug log
-      console.log('Permission check:', {
-        required: permission,
-        userPerms,
-        hasPerm,
-        active: req.user.active,
-        admin: userPerms.includes('admin')
-      });
 
       if (!hasPerm) {
         return res.status(403).json({
@@ -192,7 +184,8 @@ const optionalAuth = async (req, res, next) => {
           uid: apiKeyRecord.userId,
           authMethod: 'api-key',
           apiKeyId: apiKeyRecord.id,
-          permissions: apiKeyRecord.permissions
+          permissions: apiKeyRecord.permissions,
+          active: true
         };
       }
     }
