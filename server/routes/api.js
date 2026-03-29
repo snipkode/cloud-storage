@@ -115,6 +115,50 @@ const getPhysicalFolderPath = (uid, environment = 'live', folderPath = '/') => {
   return physicalPath;
 };
 
+/**
+ * Find physical file path by checking multiple locations
+ * Returns the path if file exists, null otherwise
+ */
+const findFilePath = (uid, environment, fileMeta) => {
+  if (!fileMeta || !fileMeta.filename) return null;
+  
+  const filename = fileMeta.filename;
+  const possiblePaths = [];
+  
+  // 1. Try folder path from metadata first
+  if (fileMeta.path) {
+    const physicalFolderPath = getPhysicalFolderPath(uid, environment, fileMeta.path);
+    possiblePaths.push(path.join(physicalFolderPath, filename));
+  }
+  
+  // 2. Try flat user directory
+  const userDir = getUserDir(uid, environment);
+  possiblePaths.push(path.join(userDir, filename));
+  
+  // 3. Try nested subfolders
+  try {
+    if (fs.existsSync(userDir)) {
+      const subdirs = fs.readdirSync(userDir).filter(f => {
+        const fullPath = path.join(userDir, f);
+        return fs.statSync(fullPath).isDirectory();
+      });
+      for (const subdir of subdirs) {
+        possiblePaths.push(path.join(userDir, subdir, filename));
+      }
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  
+  // Find the file
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+  return null;
+};
+
 // Configure multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -380,7 +424,7 @@ router.get('/files',
   try {
     const queryEnv = req.query.environment;
     const baseEnv = req.user.environment || 'live';
-    
+
     console.log(`[List Files] User: ${req.user.uid}, API Key Env: ${baseEnv}, Query Env: ${queryEnv || 'none'}`);
 
     // If user has API key with test env, they can only view test files
@@ -393,15 +437,37 @@ router.get('/files',
     } else {
       env = baseEnv;  // Default to API key environment
     }
-    
+
     console.log(`[List Files] Using environment: ${env}`);
 
     const files = await fileMetadataStore.getUserFiles(req.user.uid, env);
 
-    const totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
+    // Auto-cleanup: Remove metadata for files that don't exist physically
+    const validFiles = [];
+    const deletedCount = { count: 0 };
+    
+    for (const file of files) {
+      // Find physical file
+      const physicalPath = findFilePath(req.user.uid, env, file);
+      
+      if (physicalPath) {
+        validFiles.push(file);
+      } else {
+        // File doesn't exist, delete metadata
+        await fileMetadataStore.deleteFile(file.filename, req.user.uid, env);
+        deletedCount.count++;
+        console.log(`[List Files] Auto-deleted metadata for missing file: ${file.filename}`);
+      }
+    }
+    
+    if (deletedCount.count > 0) {
+      console.log(`[List Files] Cleaned up ${deletedCount.count} missing file(s)`);
+    }
+
+    const totalSize = validFiles.reduce((sum, f) => sum + (f.size || 0), 0);
 
     res.json({
-      files: files.map(f => ({
+      files: validFiles.map(f => ({
         id: f.id,
         filename: f.filename,
         originalname: f.originalname,
@@ -412,12 +478,13 @@ router.get('/files',
         downloadCount: f.downloadCount || 0,
         path: f.path || '/'  // Add folder path for frontend filtering
       })),
-      total: files.length,
+      total: validFiles.length,
       stats: {
-        totalFiles: files.length,
+        totalFiles: validFiles.length,
         totalSize,
         environment: env
-      }
+      },
+      cleanup: deletedCount.count > 0 ? { deleted: deletedCount.count } : undefined
     });
   } catch (error) {
     console.error('List files error:', error);
@@ -453,48 +520,10 @@ router.get('/download/:filename',
     // Sanitize filename to prevent path traversal attacks
     const filename = sanitizeFilename(req.params.filename);
 
-    // Helper function to find file in multiple locations
-    const findFilePath = (uid, environment, fileMeta) => {
-      const possiblePaths = [];
-      
-      // 1. Try folder path from metadata first
-      if (fileMeta && fileMeta.path) {
-        const physicalFolderPath = getPhysicalFolderPath(uid, environment, fileMeta.path);
-        possiblePaths.push(path.join(physicalFolderPath, filename));
-      }
-      
-      // 2. Try flat user directory
-      const userDir = getUserDir(uid, environment);
-      possiblePaths.push(path.join(userDir, filename));
-      
-      // 3. Try nested subfolders
-      try {
-        if (fs.existsSync(userDir)) {
-          const subdirs = fs.readdirSync(userDir).filter(f => {
-            const fullPath = path.join(userDir, f);
-            return fs.statSync(fullPath).isDirectory();
-          });
-          for (const subdir of subdirs) {
-            possiblePaths.push(path.join(userDir, subdir, filename));
-          }
-        }
-      } catch (e) {
-        // Ignore errors
-      }
-      
-      // Find the file
-      for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
-          return p;
-        }
-      }
-      return null;
-    };
-
     // Get file metadata from Firestore
     const fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
 
-    // Find file in current environment
+    // Find file in current environment using global helper
     let filePath = findFilePath(req.user.uid, env, fileMetadata);
 
     // If not found, try other environment
@@ -559,58 +588,21 @@ router.delete('/delete/:filename',
     // Sanitize filename to prevent path traversal attacks
     const filename = sanitizeFilename(req.params.filename);
 
-    // Get file metadata from Firestore to find the actual folder path
+    // Get file metadata from Firestore
     const fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
 
-    let filePath = null;
-    let foundPath = null;
+    // Find file using global helper
+    const filePath = findFilePath(req.user.uid, env, fileMetadata);
 
-    // Try multiple locations to find the file
-    const possiblePaths = [];
-    
-    // 1. Try folder path from metadata first
-    if (fileMetadata && fileMetadata.path) {
-      const physicalFolderPath = getPhysicalFolderPath(req.user.uid, env, fileMetadata.path);
-      possiblePaths.push(path.join(physicalFolderPath, filename));
-    }
-    
-    // 2. Try flat user directory (for backward compatibility)
-    const userDir = getUserDir(req.user.uid, env);
-    possiblePaths.push(path.join(userDir, filename));
-    
-    // 3. Try nested subfolders under user dir (search all subdirs)
-    try {
-      if (fs.existsSync(userDir)) {
-        const subdirs = fs.readdirSync(userDir).filter(f => {
-          const fullPath = path.join(userDir, f);
-          return fs.statSync(fullPath).isDirectory();
-        });
-        for (const subdir of subdirs) {
-          possiblePaths.push(path.join(userDir, subdir, filename));
-        }
-      }
-    } catch (e) {
-      console.error('[Delete] Error scanning subdirs:', e.message);
-    }
-
-    // Find the file
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        foundPath = p;
-        console.log(`[Delete] Found file at: ${p}`);
-        break;
-      }
-    }
-
-    if (!foundPath) {
+    if (!filePath) {
       console.error(`[Delete] File not found in any location`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'File not found',
         details: `File ${filename} not found in user directory or subfolders`
       });
     }
 
-    filePath = foundPath;
+    console.log(`[Delete] Found file at: ${filePath}`);
 
     // Delete physical file
     fs.unlinkSync(filePath);
@@ -641,45 +633,7 @@ router.get('/file/:filename',
       return res.status(404).json({ error: 'File not found' });
     }
 
-    // Helper function to find file in multiple locations
-    const findFilePath = (uid, environment, fileMeta) => {
-      const possiblePaths = [];
-      
-      // 1. Try folder path from metadata first
-      if (fileMeta && fileMeta.path) {
-        const physicalFolderPath = getPhysicalFolderPath(uid, environment, fileMeta.path);
-        possiblePaths.push(path.join(physicalFolderPath, filename));
-      }
-      
-      // 2. Try flat user directory
-      const userDir = getUserDir(uid, environment);
-      possiblePaths.push(path.join(userDir, filename));
-      
-      // 3. Try nested subfolders
-      try {
-        if (fs.existsSync(userDir)) {
-          const subdirs = fs.readdirSync(userDir).filter(f => {
-            const fullPath = path.join(userDir, f);
-            return fs.statSync(fullPath).isDirectory();
-          });
-          for (const subdir of subdirs) {
-            possiblePaths.push(path.join(userDir, subdir, filename));
-          }
-        }
-      } catch (e) {
-        // Ignore errors
-      }
-      
-      // Find the file
-      for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
-          return p;
-        }
-      }
-      return null;
-    };
-
-    // Find physical file
+    // Find physical file using global helper
     const filePath = findFilePath(req.user.uid, env, fileMetadata);
 
     if (!filePath) {
