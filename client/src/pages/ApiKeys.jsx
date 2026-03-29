@@ -135,6 +135,7 @@ function ApiKeys() {
   const [codeLang, setCodeLang] = useState('curl');
   const [exampleIdx, setExampleIdx] = useState(0);
   const [showIntegrationPreview, setShowIntegrationPreview] = useState(false);
+  const [environment, setEnvironment] = useState('live');
 
   const loadApiKeys = async () => {
     setLoading(true);
@@ -186,7 +187,8 @@ function ApiKeys() {
         body: JSON.stringify({
           name: keyName.trim(),
           permissions: selectedPermissions,
-          expiresAt
+          expiresAt,
+          environment
         })
       });
 
@@ -202,6 +204,7 @@ function ApiKeys() {
         setKeyName('');
         setSelectedPermissions(['read']);
         setExpiresIn('');
+        setEnvironment('live');
         loadApiKeys();
         setSuccess('API key created successfully');
         setTimeout(() => setSuccess(null), 3000);
@@ -461,6 +464,14 @@ function ApiKeys() {
                 >
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-white font-medium text-sm">{key.name}</span>
+                    <span className={`px-2 py-0.5 text-[10px] rounded-md font-medium flex items-center gap-1 ${
+                      key.environment === 'test'
+                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        : 'bg-green-500/10 text-green-400 border border-green-500/30'
+                    }`}>
+                      <span>{key.environment === 'test' ? '🧪' : '🚀'}</span>
+                      <span className="capitalize">{key.environment}</span>
+                    </span>
                     <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium flex items-center gap-1 ${
                       key.active
                         ? 'bg-green-500/10 text-green-400 border border-green-500/30'
@@ -585,6 +596,42 @@ function ApiKeys() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-2">
+                  <FiServer className="inline-block mr-1.5 text-indigo-400" />
+                  Environment
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setEnvironment('test')}
+                    className={`py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      environment === 'test'
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25'
+                        : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
+                    }`}
+                  >
+                    <span>🧪</span>
+                    <span>Sandbox</span>
+                  </button>
+                  <button
+                    onClick={() => setEnvironment('live')}
+                    className={`py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      environment === 'live'
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25'
+                        : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
+                    }`}
+                  >
+                    <span>🚀</span>
+                    <span>Live</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1.5">
+                  {environment === 'test' 
+                    ? 'Sandbox keys are for development and testing only' 
+                    : 'Live keys are for production use'}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">
                   <FiLock className="inline-block mr-1.5 text-indigo-400" />
                   Permissions
                 </label>
@@ -696,7 +743,17 @@ function ApiKeys() {
             {/* Content - Scrollable */}
             <div className="px-4 py-3 space-y-3 overflow-y-auto flex-1">
               <div>
-                <label className="block text-[10px] font-medium text-slate-400 mb-1.5">Your API Key</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-medium text-slate-400">Your API Key</label>
+                  <span className={`px-2 py-0.5 text-[10px] rounded-md font-medium flex items-center gap-1 ${
+                    newKey.environment === 'test'
+                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                      : 'bg-green-500/10 text-green-400 border border-green-500/30'
+                  }`}>
+                    <span>{newKey.environment === 'test' ? '🧪' : '🚀'}</span>
+                    <span className="capitalize">{newKey.environment}</span>
+                  </span>
+                </div>
                 <div className="flex gap-1.5">
                   <code className="flex-1 bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono break-all">
                     {newKey.key}

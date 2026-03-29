@@ -24,7 +24,7 @@ const PERMISSION_LEVELS = {
  */
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { name, permissions, expiresAt } = req.body;
+    const { name, permissions, expiresAt, environment } = req.body;
 
     // Validate name
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -33,6 +33,9 @@ router.post('/', authMiddleware, async (req, res) => {
         message: 'API key name is required'
       });
     }
+
+    // Validate environment
+    const env = environment === 'test' ? 'test' : 'live';
 
     // Validate permissions
     let selectedPermissions = permissions;
@@ -52,7 +55,7 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     // Generate API key
-    const apiKey = generateApiKey('live');
+    const apiKey = generateApiKey(env);
     const keyId = generateKeyId();
 
     // Store API key
@@ -76,6 +79,7 @@ router.post('/', authMiddleware, async (req, res) => {
         permissions: storedKey.permissions,
         expiresAt: storedKey.expiresAt,
         createdAt: storedKey.createdAt,
+        environment: env,
         warning: 'Store this API key securely. It will not be shown again!'
       }
     });
