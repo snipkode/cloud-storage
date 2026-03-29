@@ -446,7 +446,7 @@ function FileBrowser() {
         </div>
 
         {/* View Toggle - Below Filter Cards */}
-        <div className="flex items-center justify-between pt-2 border-t border-white/5">
+        <div className="flex items-center justify-between pt-3 pb-2 border-t border-white/5">
           <span className="text-xs text-slate-500">
             {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
           </span>
