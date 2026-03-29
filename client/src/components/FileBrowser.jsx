@@ -137,7 +137,8 @@ function FileBrowser() {
     if (token) {
       fetchFiles(token, currentEnvironment);
     }
-  }, [token, currentEnvironment, fetchFiles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, currentEnvironment]);
 
   // Handle environment switch
   const handleEnvironmentChange = useCallback((newEnv) => {
