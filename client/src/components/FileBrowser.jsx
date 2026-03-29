@@ -352,7 +352,7 @@ function FileBrowser() {
     <div className="h-full">
       {/* Toolbar */}
       <div className="space-y-3">
-        {/* Top Bar: Title + Search + View Toggle */}
+        {/* Top Bar: Title + Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="min-w-0">
@@ -369,6 +369,24 @@ function FileBrowser() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+            {/* Upload */}
+            <button
+              onClick={() => setUploadModalOpen(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
+            >
+              <FiUpload className="text-sm" />
+              <span className="hidden sm:inline">Upload</span>
+            </button>
+
+            {/* New Folder */}
+            <button
+              onClick={() => setShowNewFolderModal(true)}
+              className="flex items-center gap-2 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-sm font-medium transition-all"
+            >
+              <FiPlus className="text-sm" />
+              <span className="hidden sm:inline">New Folder</span>
+            </button>
+
             {/* Search */}
             <div className="relative w-full sm:w-48">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
@@ -447,27 +465,6 @@ function FileBrowser() {
               </button>
             );
           })}
-        </div>
-
-        {/* Upload Actions */}
-        <div className="flex items-center gap-2 pt-2">
-          {/* Upload */}
-          <button
-            onClick={() => setUploadModalOpen(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
-          >
-            <FiUpload className="text-sm" />
-            <span className="hidden sm:inline">Upload</span>
-          </button>
-
-          {/* New Folder */}
-          <button
-            onClick={() => setShowNewFolderModal(true)}
-            className="flex items-center gap-2 bg-slate-800/50 hover:bg-slate-700/50 border border-white/10 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-sm font-medium transition-all"
-          >
-            <FiPlus className="text-sm" />
-            <span className="hidden sm:inline">New Folder</span>
-          </button>
         </div>
       </div>
 
