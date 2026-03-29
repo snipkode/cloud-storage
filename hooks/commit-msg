@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# Git hook to auto-remove Co-authored-by from commit messages
+# Ensures only "snipkode" appears as author
+
+commit_msg_file="$1"
+
+# Remove any Co-authored-by lines (case insensitive)
+sed -i '/^Co-authored-by:/Id' "$commit_msg_file"
+
+# Remove trailing empty lines
+sed -i -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$commit_msg_file"
+
+echo "✅ Removed Co-authored-by from commit message"
+
+exit 0
