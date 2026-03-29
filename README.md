@@ -1,5 +1,13 @@
 # ☁️ Cloud Storage - Multi Tenant
 
+[![GitHub stars](https://img.shields.io/github/stars/snipkode/cloud-storage?style=for-the-badge&logo=github&color=gold)](https://github.com/snipkode/cloud-storage/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/snipkode/cloud-storage?style=for-the-badge&logo=github&color=blue)](https://github.com/snipkode/cloud-storage/network)
+[![GitHub issues](https://img.shields.io/github/issues/snipkode/cloud-storage?style=for-the-badge&logo=github&color=orange)](https://github.com/snipkode/cloud-storage/issues)
+[![GitHub license](https://img.shields.io/github/license/snipkode/cloud-storage?style=for-the-badge&logo=github&color=green)](https://github.com/snipkode/cloud-storage/blob/main/LICENSE)
+
+[![GitHub last commit](https://img.shields.io/github/last-commit/snipkode/cloud-storage?style=for-the-badge&logo=github&color=informational)](https://github.com/snipkode/cloud-storage/commits/main)
+[![GitHub repo size](https://img.shields.io/github/repo-size/snipkode/cloud-storage?style=for-the-badge&logo=github&color=purple)](https://github.com/snipkode/cloud-storage)
+
 Cloud storage application dengan React, Firebase Authentication, dan Node.js backend dengan dukungan API Key untuk integrasi aplikasi eksternal.
 
 ## 🚀 Features
