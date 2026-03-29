@@ -2,7 +2,21 @@ const crypto = require('crypto');
 
 // Use environment variable for encryption key
 // IMPORTANT: Must be set before creating API keys!
-const ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || 'default_key_do_not_use_in_production_00';
+const ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY;
+
+// Validate encryption key is set
+if (!ENCRYPTION_KEY) {
+  console.error('FATAL: API_KEY_ENCRYPTION_KEY environment variable is not set!');
+  console.error('Generate a secure key with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+  process.exit(1);
+}
+
+// Validate key length (should be at least 32 characters for AES-256)
+if (ENCRYPTION_KEY.length < 32) {
+  console.error('FATAL: API_KEY_ENCRYPTION_KEY must be at least 32 characters long');
+  process.exit(1);
+}
+
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
 

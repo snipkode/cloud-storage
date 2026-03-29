@@ -6,14 +6,61 @@ const authMiddleware = require('@middleware/auth');
 const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-auth');
 const fileMetadataStore = require('@lib/file-metadata-store');
 
+// Allowed file types for upload
+const ALLOWED_MIME_TYPES = [
+  // Images
+  'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml',
+  // Documents
+  'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain', 'text/csv', 'text/markdown',
+  // Audio
+  'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/mp4',
+  // Video
+  'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime',
+  // Archives
+  'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/gzip', 'application/x-tar'
+];
+
+const ALLOWED_EXTENSIONS = [
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+  '.txt', '.csv', '.md',
+  '.mp3', '.wav', '.ogg', '.m4a',
+  '.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv',
+  '.zip', '.rar', '.gz', '.tar'
+];
+
+/**
+ * Sanitize filename to prevent path traversal attacks
+ */
+const sanitizeFilename = (filename) => {
+  if (!filename) return '';
+  // Extract only the base filename, removing any path components
+  return path.basename(filename);
+};
+
+/**
+ * Validate file type based on MIME type and extension
+ */
+const isValidFileType = (file) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const mimetype = file.mimetype?.toLowerCase();
+
+  const validMime = ALLOWED_MIME_TYPES.includes(mimetype);
+  const validExt = ALLOWED_EXTENSIONS.includes(ext);
+
+  // Both MIME type and extension must be valid
+  return validMime && validExt;
+};
+
 // Combined auth middleware - supports both Firebase JWT and API Key
 const combinedAuth = (req, res, next) => {
   // Try API Key auth first
   const authHeader = req.headers.authorization;
   const apiKeyHeader = req.headers['x-api-key'];
-  const apiKeyQuery = req.query.api_key;
 
-  if (apiKeyHeader || apiKeyQuery || (authHeader && authHeader.includes('cs_'))) {
+  if (apiKeyHeader || (authHeader && authHeader.includes('cs_'))) {
     return apiKeyMiddleware(req, res, next);
   }
 
@@ -51,19 +98,21 @@ const storage = multer.diskStorage({
     // Check for environment override header (for UI toggle)
     const headerEnv = req.headers['x-environment'];
     const baseEnv = req.user?.environment || 'live';
-    
+
     // If user has API key with test env, they can only upload to test
     // If user has API key with live env, they can upload to either via header
-    const env = (baseEnv === 'test') 
+    const env = (baseEnv === 'test')
       ? 'test'  // Test key users are locked to test environment
       : (headerEnv === 'test' || headerEnv === 'live' ? headerEnv : baseEnv);
-    
+
     const userDir = getUserDir(req.user.uid, env);
     cb(null, userDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+    // Sanitize original filename before saving
+    const safeOriginalname = sanitizeFilename(file.originalname);
+    cb(null, uniqueSuffix + '-' + safeOriginalname);
   }
 });
 
@@ -71,7 +120,12 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   fileFilter: (req, file, cb) => {
-    cb(null, true);
+    if (isValidFileType(file)) {
+      cb(null, true);
+    } else {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(new Error(`Invalid file type. Allowed types: ${ALLOWED_EXTENSIONS.join(', ')}`));
+    }
   }
 });
 
@@ -130,7 +184,7 @@ router.post('/upload',
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: 'Upload failed', details: error.message });
+    res.status(500).json({ error: 'Upload failed' });
   }
 });
 
@@ -194,7 +248,7 @@ router.post('/upload-multiple',
     });
   } catch (error) {
     console.error('Upload multiple error:', error);
-    res.status(500).json({ error: 'Upload failed', details: error.message });
+    res.status(500).json({ error: 'Upload failed' });
   }
 });
 
@@ -247,7 +301,7 @@ router.get('/files',
     });
   } catch (error) {
     console.error('List files error:', error);
-    res.status(500).json({ error: 'Failed to list files', details: error.message });
+    res.status(500).json({ error: 'Failed to list files' });
   }
 });
 
@@ -260,7 +314,7 @@ router.get('/download/:filename',
   try {
     const queryEnv = req.query.environment;
     const baseEnv = req.user.environment || 'live';
-    
+
     console.log(`[Download] User: ${req.user.uid}, API Key Env: ${baseEnv}, Query Env: ${queryEnv}`);
 
     // If user has API key with test env, they can only download from test
@@ -273,13 +327,14 @@ router.get('/download/:filename',
     } else {
       env = baseEnv;  // Default to API key environment
     }
-    
+
     console.log(`[Download] Using environment: ${env}`);
 
     const userDir = getUserDir(req.user.uid, env);
-    const filename = req.params.filename;
+    // Sanitize filename to prevent path traversal attacks
+    const filename = sanitizeFilename(req.params.filename);
     let filePath = path.join(userDir, filename);
-    
+
     console.log(`[Download] File path: ${filePath}`);
 
     // Check if file exists BEFORE trying to download
@@ -323,7 +378,7 @@ router.get('/download/:filename',
     res.download(filePath);
   } catch (error) {
     console.error('Download error:', error);
-    res.status(500).json({ error: 'Download failed', details: error.message });
+    res.status(500).json({ error: 'Download failed' });
   }
 });
 
@@ -349,7 +404,8 @@ router.delete('/delete/:filename',
     }
 
     const userDir = getUserDir(req.user.uid, env);
-    const filename = req.params.filename;
+    // Sanitize filename to prevent path traversal attacks
+    const filename = sanitizeFilename(req.params.filename);
     const filePath = path.join(userDir, filename);
 
     if (!fs.existsSync(filePath)) {
@@ -365,7 +421,7 @@ router.delete('/delete/:filename',
     res.json({ message: 'File deleted successfully' });
   } catch (error) {
     console.error('Delete error:', error);
-    res.status(500).json({ error: 'Delete failed', details: error.message });
+    res.status(500).json({ error: 'Delete failed' });
   }
 });
 
@@ -410,7 +466,7 @@ router.get('/file/:filename',
     });
   } catch (error) {
     console.error('Get file info error:', error);
-    res.status(500).json({ error: 'Failed to get file info', details: error.message });
+    res.status(500).json({ error: 'Failed to get file info' });
   }
 });
 
@@ -425,7 +481,7 @@ router.get('/storage-stats',
     res.json({ ...stats, environment: env });
   } catch (error) {
     console.error('Storage stats error:', error);
-    res.status(500).json({ error: 'Failed to get stats', details: error.message });
+    res.status(500).json({ error: 'Failed to get stats' });
   }
 });
 

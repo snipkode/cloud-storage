@@ -7,20 +7,20 @@ const { decrypt } = require('../lib/encryption');
  * Supports two authentication methods:
  * 1. Firebase JWT Token (Bearer token)
  * 2. API Key (Bearer key or X-API-Key header)
+ * 
+ * Note: API keys via query parameters are NOT supported for security reasons
+ * (query params can be logged in server logs, browser history, referer headers)
  */
 const apiKeyMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     const apiKeyHeader = req.headers['x-api-key'];
-    const apiKeyQuery = req.query.api_key;
 
     let apiKey = null;
 
-    // Get API key from various sources
+    // Get API key from headers only (NOT query params for security)
     if (apiKeyHeader) {
       apiKey = apiKeyHeader;
-    } else if (apiKeyQuery) {
-      apiKey = apiKeyQuery;
     } else if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split('Bearer ')[1];
 
@@ -157,14 +157,11 @@ const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     const apiKeyHeader = req.headers['x-api-key'];
-    const apiKeyQuery = req.query.api_key;
 
     let apiKey = null;
 
     if (apiKeyHeader) {
       apiKey = apiKeyHeader;
-    } else if (apiKeyQuery) {
-      apiKey = apiKeyQuery;
     } else if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split('Bearer ')[1];
       if (token.startsWith('cs_')) {
