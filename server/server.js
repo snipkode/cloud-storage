@@ -13,6 +13,7 @@ moduleAlias.addAliases({
 
 const apiRoutes = require('./routes/api');
 const apiKeyRoutes = require('./routes/api-keys');
+const { initialized: firestoreInitialized } = require('./lib/firebase-admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,11 +45,13 @@ if (require('fs').existsSync(clientDist)) {
 // Start server
 app.listen(PORT, () => {
   const uploadPath = path.join(__dirname, 'uploads');
+  const storageMode = firestoreInitialized ? 'Firestore' : 'Filesystem';
   console.log(`
 Cloud Storage Server
 ========================================
-Server:   http://localhost:${PORT}
-Uploads:  ${uploadPath}
+Server:    http://localhost:${PORT}
+Uploads:   ${uploadPath}
+Storage:   ${storageMode} mode
 
 API Keys:
   POST   /api/api-keys              - Generate

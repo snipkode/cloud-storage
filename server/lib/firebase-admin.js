@@ -11,6 +11,7 @@ const path = require('path');
 const serviceAccountPath = path.resolve(process.cwd(), 'firebase-service-key.json');
 
 let initialized = false;
+let db = null;
 
 // Check if Firebase is already initialized
 try {
@@ -21,25 +22,25 @@ try {
     });
     console.log('✓ Firebase Admin SDK initialized with service account');
     console.log('  Project ID:', serviceAccount.project_id);
+    
+    // Initialize Firestore
+    db = admin.firestore();
+    console.log('✓ Firestore initialized');
+    initialized = true;
   } else {
-    console.warn('⚠ Firebase service account key not found at:', serviceAccountPath);
-    console.warn('  Running without credentials - token verification may fail');
-    admin.initializeApp();
+    console.warn('⚠ Firebase service account key not found');
+    console.warn('  Running in filesystem-only mode');
   }
-  initialized = true;
 } catch (error) {
   if (error.code === 'app/duplicate-app' || error.message.includes('already exists')) {
     console.log('✓ Firebase Admin SDK already initialized');
+    db = admin.firestore();
     initialized = true;
   } else {
     console.error('✗ Firebase Admin SDK initialization error:');
     console.error('  Error:', error.message);
-    console.error('  Path:', serviceAccountPath);
+    console.warn('  Falling back to filesystem mode');
   }
 }
 
-// Initialize Firestore
-const db = admin.firestore();
-console.log('✓ Firestore initialized');
-
-module.exports = { admin, db };
+module.exports = { admin, db, initialized };
