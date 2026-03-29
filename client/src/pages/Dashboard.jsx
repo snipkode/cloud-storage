@@ -1,26 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
-import { FiKey, FiFolder, FiBell, FiSearch, FiMenu, FiX, FiHome, FiLogOut } from 'react-icons/fi';
+import { useState } from 'react';
+import { FiKey, FiFolder, FiBell, FiSearch, FiMenu, FiX, FiLogOut } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
-import { useFilesStore } from '@store/filesStore';
 import ApiKeys from '@pages/ApiKeys';
 import FileBrowser from '@components/FileBrowser';
 
 function Dashboard() {
   const { user, token, logout } = useAuthStore();
-  const { fetchFiles } = useFilesStore();
   const [currentPage, setCurrentPage] = useState('files');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
-  const loadData = useCallback(async () => {
-    if (token) {
-      await fetchFiles(token);
-    }
-  }, [token, fetchFiles]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
 
   const navItems = [
     { id: 'files', label: 'Files', icon: FiFolder },
