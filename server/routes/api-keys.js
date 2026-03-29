@@ -316,6 +316,37 @@ router.post('/:id/toggle', authMiddleware, async (req, res) => {
 });
 
 /**
+ * Reveal API key (decrypt for display)
+ * GET /api/api-keys/:id/reveal
+ */
+router.get('/:id/reveal', authMiddleware, async (req, res) => {
+  try {
+    const result = await apiKeyStore.revealApiKey(req.params.id, req.user.uid);
+
+    if (!result || !result.key) {
+      return res.status(404).json({
+        error: 'Not found',
+        message: 'API key not found or cannot be revealed'
+      });
+    }
+
+    res.json({
+      apiKey: {
+        id: result.id,
+        key: result.key,
+        environment: result.environment
+      }
+    });
+  } catch (error) {
+    console.error('Reveal API key error:', error);
+    res.status(500).json({
+      error: 'Failed to reveal API key',
+      message: error.message
+    });
+  }
+});
+
+/**
  * Delete API key permanently
  * DELETE /api/api-keys/:id
  */

@@ -1,5 +1,6 @@
 const { db } = require('./firebase-admin');
 const { hashApiKey } = require('./api-key-generator');
+const { encrypt, decrypt } = require('./encryption');
 
 const API_KEYS_COLLECTION = 'apiKeys';
 
@@ -7,9 +8,12 @@ const API_KEYS_COLLECTION = 'apiKeys';
  * Create new API key
  */
 const createApiKey = async (apiKeyData) => {
+  const encryptedKey = encrypt(apiKeyData.key);
+  
   const newKey = {
     id: apiKeyData.id,
     keyHash: hashApiKey(apiKeyData.key),
+    encryptedKey: encryptedKey, // Store encrypted key for later retrieval
     userId: apiKeyData.userId,
     name: apiKeyData.name,
     permissions: apiKeyData.permissions,
@@ -23,6 +27,26 @@ const createApiKey = async (apiKeyData) => {
   await db.collection(API_KEYS_COLLECTION).doc(newKey.id).set(newKey);
 
   return newKey;
+};
+
+/**
+ * Reveal/decrypt API key (for display purposes)
+ */
+const revealApiKey = async (id, userId) => {
+  const apiKey = await getApiKeyById(id);
+  
+  if (!apiKey || apiKey.userId !== userId) return null;
+  
+  if (!apiKey.encryptedKey) {
+    return null; // Key was stored before encryption was implemented
+  }
+  
+  const decryptedKey = decrypt(apiKey.encryptedKey);
+  return {
+    id: apiKey.id,
+    key: decryptedKey,
+    environment: decryptedKey?.startsWith('cs_test_') ? 'test' : 'live'
+  };
 };
 
 /**
@@ -172,6 +196,7 @@ module.exports = {
   revokeApiKey,
   reactivateApiKey,
   toggleApiKeyStatus,
+  revealApiKey,
   deleteApiKey,
   hasPermission,
   isExpired

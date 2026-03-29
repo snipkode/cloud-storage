@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   FiKey, FiPlus, FiTrash2, FiLock, FiCopy, FiCheck,
-  FiX, FiActivity, FiSearch, FiXCircle,
+  FiX, FiActivity, FiSearch, FiXCircle, FiEye,
   FiBook, FiShield, FiClock, FiServer, FiUnlock
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
@@ -136,6 +136,8 @@ function ApiKeys() {
   const [exampleIdx, setExampleIdx] = useState(0);
   const [showIntegrationPreview, setShowIntegrationPreview] = useState(false);
   const [environment, setEnvironment] = useState('live');
+  const [showRevealModal, setShowRevealModal] = useState(false);
+  const [revealedKey, setRevealedKey] = useState(null);
 
   const loadApiKeys = async () => {
     setLoading(true);
@@ -290,6 +292,23 @@ function ApiKeys() {
       }
     } catch {
       setError('Failed to delete API key');
+    }
+  };
+
+  const handleReveal = async (id) => {
+    try {
+      const res = await fetch(`/api/api-keys/${id}/reveal`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRevealedKey(data.apiKey);
+        setShowRevealModal(true);
+      } else {
+        setError(data.error || 'Failed to reveal API key');
+      }
+    } catch {
+      setError('Failed to reveal API key');
     }
   };
 
@@ -549,6 +568,16 @@ function ApiKeys() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReveal(key.id);
+                    }}
+                    className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
+                    title="Show API Key"
+                  >
+                    <FiEye className="text-sm" />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1032,6 +1061,74 @@ function ApiKeys() {
               <button
                 onClick={() => setShowCodeModal(false)}
                 className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-xs font-medium transition-all"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reveal API Key Modal */}
+      {showRevealModal && revealedKey && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl">
+            {/* Header - Fixed */}
+            <div className="px-4 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/25 flex-shrink-0">
+                <FiEye className="text-white text-lg" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-white font-semibold text-sm truncate">API Key</h3>
+                <p className="text-xs text-slate-500 truncate">{revealedKey.environment} key</p>
+              </div>
+            </div>
+
+            {/* Content - Scrollable */}
+            <div className="px-4 py-3 space-y-3 overflow-y-auto flex-1">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-medium text-slate-400">Your API Key</label>
+                  <span className={`px-2 py-0.5 text-[10px] rounded-md font-medium flex items-center gap-1 ${
+                    revealedKey.environment === 'test'
+                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                      : 'bg-green-500/10 text-green-400 border border-green-500/30'
+                  }`}>
+                    <span>{revealedKey.environment === 'test' ? '🧪' : '🚀'}</span>
+                    <span className="capitalize">{revealedKey.environment}</span>
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  <code className="flex-1 bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono break-all">
+                    {revealedKey.key}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(revealedKey.key)}
+                    className={`px-3 rounded-lg transition-all flex items-center justify-center flex-shrink-0 ${
+                      copied
+                        ? 'bg-green-500 text-white'
+                        : 'bg-indigo-500 hover:bg-indigo-600 text-white'
+                    }`}
+                  >
+                    {copied ? <FiCheck className="text-base" /> : <FiCopy className="text-base" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 flex items-start gap-3">
+                <div className="text-lg flex-shrink-0">⚠️</div>
+                <div>
+                  <p className="text-amber-400 text-xs font-medium mb-0.5">Important</p>
+                  <p className="text-amber-400/70 text-[10px] leading-relaxed">Store this key securely. Do not share it or expose it in client-side code.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer - Fixed */}
+            <div className="px-4 py-3 border-t border-white/5 flex justify-end flex-shrink-0">
+              <button
+                onClick={() => setShowRevealModal(false)}
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-5 py-2 rounded-lg text-xs font-medium transition-all shadow-lg shadow-indigo-500/25"
               >
                 Done
               </button>
