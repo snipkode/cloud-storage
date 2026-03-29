@@ -351,37 +351,38 @@ function FileBrowser() {
   return (
     <div className="h-full">
       {/* Toolbar */}
-      <div className="space-y-3 mb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1">
-            <div>
-              <h1 className="text-white font-semibold text-lg">
+      <div className="space-y-3">
+        {/* Top Bar: Title + Search + View Toggle */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="min-w-0">
+              <h1 className="text-white font-semibold text-lg truncate">
                 {currentFolder ? (currentFolder.originalname || currentFolder.name) : 'All Files'}
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
                 {currentFolder ? 'Browse folder contents' : 'Manage and organize your files'}
               </p>
             </div>
-            <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-full hidden sm:inline">
+            <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-full flex-shrink-0 hidden sm:inline">
               {folders.length + fileList.length} items
             </span>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
             {/* Search */}
-            <div className="relative">
+            <div className="relative w-full sm:w-48">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
               <input
                 type="search"
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full sm:w-48 bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
               />
             </div>
 
             {/* View toggle */}
-            <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/10">
+            <div className="flex bg-slate-800/50 rounded-lg p-1 border border-white/10 flex-shrink-0">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded-md transition-all ${
@@ -448,7 +449,8 @@ function FileBrowser() {
           })}
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Upload Actions */}
+        <div className="flex items-center gap-2 pt-2">
           {/* Upload */}
           <button
             onClick={() => setUploadModalOpen(true)}
