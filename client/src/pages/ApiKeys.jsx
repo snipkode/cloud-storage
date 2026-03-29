@@ -463,8 +463,8 @@ function ApiKeys() {
                     setShowCodeModal(true);
                   }}
                 >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-white font-medium text-sm truncate max-w-[200px]">{key.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-medium text-sm truncate">{key.name}</span>
                     <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium flex items-center gap-1 flex-shrink-0 ${
                       key.active
                         ? 'bg-green-500/10 text-green-400 border border-green-500/30'
@@ -474,7 +474,7 @@ function ApiKeys() {
                       {key.active ? 'Active' : 'Revoked'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-500 flex-wrap mt-0.5">
+                  <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
                     <span className={`font-mono px-1.5 py-0.5 rounded border flex items-center gap-1 flex-shrink-0 ${
                       key.environment === 'test'
                         ? 'bg-amber-500/5 border-amber-500/20 text-amber-400'
