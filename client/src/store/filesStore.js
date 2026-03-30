@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import { useAuthStore } from '@store/authStore';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -21,7 +22,6 @@ export const useFilesStore = create((set, get) => ({
 
       // Handle 401 - Token expired
       if (res.status === 401) {
-        const { useAuthStore } = await import('@store/authStore');
         const refreshed = await useAuthStore.getState().handleAuthError({ status: 401 });
         if (refreshed) {
           // Retry with new token
@@ -55,7 +55,6 @@ export const useFilesStore = create((set, get) => ({
 
       // Handle 401 - Token expired
       if (res.status === 401) {
-        const { useAuthStore } = await import('@store/authStore');
         const refreshed = await useAuthStore.getState().handleAuthError({ status: 401 });
         if (refreshed) {
           const newToken = useAuthStore.getState().token;
@@ -95,7 +94,6 @@ export const useFilesStore = create((set, get) => ({
 
       // Handle 401 - Token expired
       if (res.status === 401) {
-        const { useAuthStore } = await import('@store/authStore');
         const refreshed = await useAuthStore.getState().handleAuthError({ status: 401 });
         if (refreshed) {
           const newToken = useAuthStore.getState().token;
@@ -129,7 +127,6 @@ export const useFilesStore = create((set, get) => ({
 
       // Handle 401 - Token expired
       if (res.status === 401) {
-        const { useAuthStore } = await import('@store/authStore');
         const refreshed = await useAuthStore.getState().handleAuthError({ status: 401 });
         if (refreshed) {
           const newToken = useAuthStore.getState().token;

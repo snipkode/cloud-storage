@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { FiVolume2, FiSend, FiUsers, FiUser, FiAlertCircle, FiX, FiChevronDown } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useAdminStore } from '@store/adminStore';
+import { useNotificationStore } from '@store/notificationStore';
+import AppLayout from '@components/AppLayout';
 
 function Broadcast() {
   const { user } = useAuthStore();
@@ -78,12 +80,11 @@ function Broadcast() {
       if (res.ok) {
         setSent(true);
         setFormData({ title: '', message: '', priority: 'normal', link: '', recipientType: 'all', selectedUserIds: [] });
-        
+
         // Refresh notifications
-        const { useNotificationStore } = await import('@store/notificationStore');
         useNotificationStore.getState().fetchNotifications();
         useNotificationStore.getState().fetchUnreadCount();
-        
+
         setTimeout(() => setSent(false), 2500);
       } else {
         setError(data.error || 'Failed to send');
@@ -105,7 +106,8 @@ function Broadcast() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-3">
+    <AppLayout>
+      <div className="max-w-2xl mx-auto space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-md flex items-center justify-center">
@@ -288,7 +290,8 @@ function Broadcast() {
           </button>
         </div>
       </form>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
 

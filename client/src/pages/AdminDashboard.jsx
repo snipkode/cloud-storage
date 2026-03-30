@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useAdminStore } from '@store/adminStore';
+import AppLayout from '@components/AppLayout';
 
 // Compact Stats Card Component
 function StatCard({ icon: Icon, label, value, change, color, loading }) {
@@ -424,7 +425,8 @@ function AdminDashboard() {
   };
 
   return (
-    <div className="space-y-4">
+    <AppLayout>
+      <div className="space-y-4">
       {/* Compact Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -584,7 +586,8 @@ function AdminDashboard() {
       )}
       <SystemLogsModal isOpen={showLogsModal} onClose={() => setShowLogsModal(false)} />
       <SambaModal isOpen={showSambaModal} onClose={() => setShowSambaModal(false)} />
-    </div>
+      </div>
+    </AppLayout>
   );
 }
 

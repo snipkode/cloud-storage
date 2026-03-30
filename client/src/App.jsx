@@ -1,8 +1,12 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@store/authStore';
+import ErrorBoundary from '@components/ErrorBoundary';
 import Login from '@pages/Login';
 import Dashboard from '@pages/Dashboard';
+import ApiKeys from '@pages/ApiKeys';
+import AdminDashboard from '@pages/AdminDashboard';
+import Broadcast from '@pages/Broadcast';
 import TokenExpiredWarning from '@components/TokenExpiredWarning';
 
 function AppContent() {
@@ -25,7 +29,13 @@ function AppContent() {
   return (
     <>
       <TokenExpiredWarning />
-      {isAuthenticated ? <Dashboard initialPage={initialPage} /> : <Login />}
+      {isAuthenticated ? (
+        <ErrorBoundary>
+          <Dashboard initialPage={initialPage} />
+        </ErrorBoundary>
+      ) : (
+        <Login />
+      )}
     </>
   );
 }
@@ -35,10 +45,9 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<AppContent />} />
-        <Route path="/files" element={<AppContent />} />
-        <Route path="/api-keys" element={<AppContent />} />
-        <Route path="/admin" element={<AppContent />} />
-        <Route path="/broadcast" element={<AppContent />} />
+        <Route path="/api-keys" element={<ApiKeys />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/broadcast" element={<Broadcast />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

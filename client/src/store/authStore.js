@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { app, isFirebaseMock } from '@lib/firebase-app';
+import { useNotificationStore } from '@store/notificationStore';
 
 const useAuthStore = create((set, get) => ({
   user: null,
@@ -128,7 +129,6 @@ const useAuthStore = create((set, get) => ({
         isAuthenticated: false
       });
       // Clear notifications
-      const { useNotificationStore } = await import('./notificationStore');
       useNotificationStore.getState().clear();
       return { success: true };
     }
@@ -143,7 +143,6 @@ const useAuthStore = create((set, get) => ({
         isAuthenticated: false
       });
       // Clear notifications
-      const { useNotificationStore } = await import('./notificationStore');
       useNotificationStore.getState().clear();
       return { success: true };
     } catch (error) {

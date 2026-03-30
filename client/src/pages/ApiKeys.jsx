@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import ApiIntegrationPreview from '@components/ApiIntegrationPreview';
+import AppLayout from '@components/AppLayout';
 
 const PERMISSION_LEVELS = [
   {
@@ -101,8 +102,11 @@ function ApiKeys() {
   const [showRevealModal, setShowRevealModal] = useState(false);
   const [revealedKey, setRevealedKey] = useState(null);
 
+  console.log('[ApiKeys] token:', !!token, 'authLoading:', authLoading, 'apiKeys:', apiKeys.length);
+
   // Handle not authenticated
   if (!token) {
+    console.log('[ApiKeys] No token, showing auth required');
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
@@ -328,7 +332,8 @@ function ApiKeys() {
   };
 
   return (
-    <div className="space-y-4">
+    <AppLayout>
+      <div className="space-y-4">
       {/* Action Bar */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -1116,7 +1121,8 @@ function ApiKeys() {
       {showIntegrationPreview && (
         <ApiIntegrationPreview onClose={() => setShowIntegrationPreview(false)} />
       )}
-    </div>
+      </div>
+    </AppLayout>
   );
 }
 

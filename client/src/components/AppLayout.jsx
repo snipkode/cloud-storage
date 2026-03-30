@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { FiFolder, FiBell, FiMenu, FiX, FiLogOut, FiKey, FiShield, FiVolume2, FiFile } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
-import FileBrowser from '@components/FileBrowser';
 import NotificationPanel from '@components/NotificationPanel';
+import ErrorBoundary from '@components/ErrorBoundary';
 
 function NotificationButton({ onClick }) {
   const { unreadCount } = useNotificationStore();
@@ -23,7 +23,7 @@ function NotificationButton({ onClick }) {
   );
 }
 
-function Dashboard({ initialPage = 'files' }) {
+function AppLayout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, token, logout, loading } = useAuthStore();
@@ -31,7 +31,7 @@ function Dashboard({ initialPage = 'files' }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
 
-  console.log('[Dashboard] loading:', loading, 'token:', !!token, 'location:', location.pathname);
+  console.log('[AppLayout] loading:', loading, 'token:', !!token, 'location:', location.pathname, 'user role:', user?.role);
 
   // Show loading state while auth is being checked
   if (loading) {
@@ -39,7 +39,7 @@ function Dashboard({ initialPage = 'files' }) {
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="text-center">
           <div className="text-5xl animate-bounce mb-4">☁️</div>
-          <p className="text-slate-400 text-sm animate-pulse">Loading your cloud storage...</p>
+          <p className="text-slate-400 text-sm animate-pulse">Loading...</p>
         </div>
       </div>
     );
@@ -47,30 +47,26 @@ function Dashboard({ initialPage = 'files' }) {
 
   // Determine current page from URL
   const getPageFromPath = () => {
-    const path = location.pathname.slice(1); // Remove leading /
+    const path = location.pathname.slice(1);
     if (['files', 'api-keys', 'admin', 'broadcast'].includes(path)) {
       return path;
     }
-    return 'files'; // Default fallback
+    return 'files';
   };
 
   const [currentPage, setCurrentPage] = useState(getPageFromPath());
 
-  // Update page when URL changes
   useEffect(() => {
     const page = getPageFromPath();
-    console.log('[Dashboard] URL changed, page:', page, 'location:', location.pathname);
     setCurrentPage(page);
   }, [location.pathname]);
 
-  // Navigate to page and update URL
   const navigateToPage = (page) => {
-    setCurrentPage(page);
     navigate(`/${page}`);
     setSidebarOpen(false);
   };
 
-  // Initialize notification store with token
+  // Initialize notifications
   useEffect(() => {
     if (token) {
       setToken(token);
@@ -79,30 +75,20 @@ function Dashboard({ initialPage = 'files' }) {
     }
   }, [token]);
 
-  const navItems = [
-    { id: 'files', label: 'Files', icon: FiFolder },
-  ];
-
   // System navigation based on user role
   const systemNavItems = useMemo(() => {
-    console.log('[Dashboard] User role:', user?.role);
     const items = [
       { id: 'api-keys', label: 'API Keys', icon: FiKey },
     ];
 
-    // Admin can access Admin panel
     if (user?.role === 'admin' || user?.role === 'super_admin') {
-      console.log('[Dashboard] Adding Admin menu');
       items.push({ id: 'admin', label: 'Admin', icon: FiShield });
     }
 
-    // Only super_admin can access Broadcast
     if (user?.role === 'super_admin') {
-      console.log('[Dashboard] Adding Broadcast menu');
       items.push({ id: 'broadcast', label: 'Broadcast', icon: FiVolume2 });
     }
 
-    console.log('[Dashboard] System nav items:', items);
     return items;
   }, [user?.role]);
 
@@ -114,7 +100,6 @@ function Dashboard({ initialPage = 'files' }) {
           <div className="flex items-center justify-between h-14">
             {/* Left Section */}
             <div className="flex items-center gap-4">
-              {/* Mobile Menu Button */}
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
@@ -136,12 +121,8 @@ function Dashboard({ initialPage = 'files' }) {
 
             {/* Right Section */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Notifications */}
-              <NotificationButton
-                onClick={() => setNotificationPanelOpen(true)}
-              />
+              <NotificationButton onClick={() => setNotificationPanelOpen(true)} />
 
-              {/* User Menu */}
               <div className="flex items-center gap-2 sm:gap-3 pl-3 border-l border-white/10">
                 {user?.photoURL && (
                   <img
@@ -172,26 +153,23 @@ function Dashboard({ initialPage = 'files' }) {
           <div className="flex-1 py-3 px-2 overflow-y-auto">
             {/* Main Navigation */}
             <nav className="space-y-0.5 mb-3">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => navigateToPage(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    currentPage === item.id
-                      ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/10'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    currentPage === item.id 
-                      ? 'bg-indigo-500/20 border border-indigo-500/30' 
-                      : 'bg-slate-800/50'
-                  }`}>
-                    <item.icon className={`text-sm ${currentPage === item.id ? 'text-indigo-400' : 'text-slate-400'}`} />
-                  </div>
-                  <span>{item.label}</span>
-                </button>
-              ))}
+              <button
+                onClick={() => navigateToPage('files')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  currentPage === 'files'
+                    ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/10'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  currentPage === 'files' 
+                    ? 'bg-indigo-500/20 border border-indigo-500/30' 
+                    : 'bg-slate-800/50'
+                }`}>
+                  <FiFolder className={`text-sm ${currentPage === 'files' ? 'text-indigo-400' : 'text-slate-400'}`} />
+                </div>
+                <span>Files</span>
+              </button>
             </nav>
 
             {/* System Section */}
@@ -332,22 +310,17 @@ function Dashboard({ initialPage = 'files' }) {
           </div>
 
           <nav className="p-3 space-y-1">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  navigateToPage(item.id);
-                }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  currentPage === item.id
-                    ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <item.icon className="text-base" />
-                {item.label}
-              </button>
-            ))}
+            <button
+              onClick={() => navigateToPage('files')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                currentPage === 'files'
+                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <FiFolder className="text-base" />
+              Files
+            </button>
 
             {/* System Section - Mobile */}
             {systemNavItems.length > 0 && (
@@ -369,9 +342,7 @@ function Dashboard({ initialPage = 'files' }) {
                     return (
                       <button
                         key={item.id}
-                        onClick={() => {
-                          navigateToPage(item.id);
-                        }}
+                        onClick={() => navigateToPage(item.id)}
                         className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all ${
                           isActive
                             ? `bg-${activeColor}-500/15 text-${activeColor}-400 border border-${activeColor}-500/25 shadow-lg shadow-${activeColor}-500/10`
@@ -392,10 +363,9 @@ function Dashboard({ initialPage = 'files' }) {
         {/* Main Content */}
         <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/30">
           <div className="max-w-[1600px] mx-auto p-4 sm:p-5 lg:p-6">
-            {/* Page Content */}
-            <div className="animate-fade-in-up">
-              <FileBrowser />
-            </div>
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </div>
         </main>
       </div>
@@ -409,4 +379,4 @@ function Dashboard({ initialPage = 'files' }) {
   );
 }
 
-export default Dashboard;
+export default AppLayout;
