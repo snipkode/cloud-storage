@@ -80,6 +80,55 @@ Aplikasi akan berjalan di:
 - **Frontend**: http://localhost:5173
 - **Backend**: http://localhost:3000
 
+## 🔒 Security
+
+### Security Features
+
+- ✅ **Role-Based Access Control** - User, Admin, Super Admin roles
+- ✅ **API Key Encryption** - AES-256-CBC encrypted storage with SHA-256 hashing
+- ✅ **Rate Limiting** - 1000 req/15min (general), 200 req/15min (auth), 100 req/15min (downloads)
+- ✅ **File Type Validation** - MIME type + extension whitelist
+- ✅ **Path Traversal Protection** - Filename sanitization
+- ✅ **Environment Isolation** - Separate test/live storage
+- ✅ **CORS Protection** - Configurable allowed origins
+- ✅ **Security Headers** - Helmet.js headers
+- ✅ **Secure Logging** - Sensitive data only logged in development
+
+### API Key Security
+
+**Format:** `cs_{env}_{48-hex-chars}`
+- `cs_live_...` - Production environment
+- `cs_test_...` - Sandbox environment
+
+**Best Practices:**
+1. Store API keys in environment variables (never in source code)
+2. Use minimum required permissions
+3. Rotate keys periodically
+4. Revoke immediately if compromised
+5. Monitor usage statistics
+
+### Encryption Key Setup
+
+The API key encryption requires a **64-character hexadecimal key**:
+
+```bash
+# Generate secure encryption key
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# Add to server/.env
+API_KEY_ENCRYPTION_KEY=<generated-key>
+```
+
+> ⚠️ **Important:** The encryption key must be exactly 64 hexadecimal characters. Non-hex keys are rejected.
+
+### Rate Limits
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| General API | 1000 req | 15 minutes |
+| Auth endpoints | 200 req | 15 minutes |
+| Download endpoints | 100 req | 15 minutes |
+
 ## 📡 API Endpoints
 
 ### Authentication Methods
@@ -99,12 +148,8 @@ atau
 ```
 X-API-Key: cs_live_xxxxxxxxxxxxx
 ```
-atau
-```
-?api_key=cs_live_xxxxxxxxxxxxx
-```
 
-> **Note:** Middleware akan mengecek API Key terlebih dahulu, lalu fallback ke Firebase JWT.
+> **Note:** Query parameters for API keys are **NOT supported** for security reasons (prevents logging exposure).
 
 ---
 

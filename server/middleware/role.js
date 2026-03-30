@@ -1,4 +1,5 @@
 const { db } = require('../lib/firebase-admin');
+const logger = require('../lib/logger');
 
 const USERS_COLLECTION = 'users';
 
@@ -18,7 +19,7 @@ const getUserRole = async (userId) => {
     // If user document doesn't exist, return default role
     return 'user';
   } catch (error) {
-    console.error('Error getting user role:', error);
+    logger.error('Error getting user role:', error.message);
     return 'user';
   }
 };
@@ -35,7 +36,7 @@ const setUserRole = async (userId, role) => {
 
     return true;
   } catch (error) {
-    console.error('Error setting user role:', error);
+    logger.error('Error setting user role:', error.message);
     return false;
   }
 };
@@ -76,7 +77,7 @@ const requireRole = (requiredRole) => {
 
       next();
     } catch (error) {
-      console.error('Role check error:', error);
+      logger.error('Role check error:', error.message);
       return res.status(500).json({
         error: 'Internal server error',
         message: 'Failed to verify user role'

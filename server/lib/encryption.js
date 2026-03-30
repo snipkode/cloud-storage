@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const logger = require('./logger');
 
 // Use environment variable for encryption key
 // IMPORTANT: Must be set before creating API keys!
@@ -11,19 +12,20 @@ if (!ENCRYPTION_KEY) {
   process.exit(1);
 }
 
-// Validate key length (should be at least 32 characters for AES-256)
-if (ENCRYPTION_KEY.length < 32) {
-  console.error('FATAL: API_KEY_ENCRYPTION_KEY must be at least 32 characters long');
+// Validate key format - must be exactly 64 hexadecimal characters (32 bytes)
+const HEX_PATTERN = /^[a-fA-F0-9]{64}$/;
+if (!HEX_PATTERN.test(ENCRYPTION_KEY)) {
+  console.error('FATAL: API_KEY_ENCRYPTION_KEY must be exactly 64 hexadecimal characters');
+  console.error('Generate a secure key with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
   process.exit(1);
 }
 
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
 
-// Ensure key is exactly 32 bytes for AES-256
+// Convert hex key to buffer
 const getKeyBuffer = (key) => {
-  const keyStr = key.slice(0, 32).padEnd(32, '0');
-  return Buffer.from(keyStr);
+  return Buffer.from(key, 'hex');
 };
 
 /**
@@ -41,7 +43,7 @@ const encrypt = (text) => {
     // Return IV + encrypted data (IV needed for decryption)
     return iv.toString('hex') + ':' + encrypted;
   } catch (error) {
-    console.error('Encryption error:', error);
+    logger.error('Encryption error:', error.message);
     return null;
   }
 };
@@ -67,7 +69,7 @@ const decrypt = (encryptedText) => {
 
     return decrypted;
   } catch (error) {
-    console.error('Decryption error:', error);
+    logger.error('Decryption error:', error.message);
     return null;
   }
 };

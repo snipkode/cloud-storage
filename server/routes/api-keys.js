@@ -1,12 +1,13 @@
 const express = require('express');
-const { 
-  generateApiKey, 
-  generateKeyId, 
-  maskApiKey 
+const {
+  generateApiKey,
+  generateKeyId,
+  maskApiKey
 } = require('@lib/api-key-generator');
 const apiKeyStore = require('@lib/api-key-store');
 const authMiddleware = require('@middleware/auth');
 const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-auth');
+const logger = require('@lib/logger');
 
 const router = express.Router();
 
@@ -44,9 +45,9 @@ router.post('/', authMiddleware, async (req, res) => {
       selectedPermissions = PERMISSION_LEVELS.READ_ONLY;
     }
 
-    // Validate permission values
+    // Validate permission values - ensure each permission is a string
     const validPermissions = ['read', 'upload', 'delete', 'admin'];
-    const hasInvalidPermission = selectedPermissions.some(p => !validPermissions.includes(p));
+    const hasInvalidPermission = selectedPermissions.some(p => typeof p !== 'string' || !validPermissions.includes(p));
     if (hasInvalidPermission) {
       return res.status(400).json({
         error: 'Invalid permissions',
@@ -84,7 +85,7 @@ router.post('/', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Create API key error:', error);
+    logger.error('Create API key error:', error.message);
     res.status(500).json({
       error: 'Failed to create API key',
       message: error.message
@@ -111,7 +112,7 @@ router.get('/', authMiddleware, async (req, res) => {
       total: mappedKeys.length
     });
   } catch (error) {
-    console.error('List API keys error:', error);
+    logger.error('List API keys error:', error.message);
     res.status(500).json({
       error: 'Failed to list API keys',
       message: error.message
@@ -183,7 +184,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get API key error:', error);
+    logger.error('Get API key error:', error.message);
     res.status(500).json({
       error: 'Failed to get API key',
       message: error.message
@@ -217,10 +218,10 @@ router.get('/:id/usage', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get usage error:', error);
-    res.status(500).json({ 
+    logger.error('Get usage error:', error.message);
+    res.status(500).json({
       error: 'Failed to get usage stats',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -248,7 +249,7 @@ router.post('/:id/revoke', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Revoke API key error:', error);
+    logger.error('Revoke API key error:', error.message);
     res.status(500).json({
       error: 'Failed to revoke API key',
       message: error.message
@@ -279,7 +280,7 @@ router.post('/:id/reactivate', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Reactivate API key error:', error);
+    logger.error('Reactivate API key error:', error.message);
     res.status(500).json({
       error: 'Failed to reactivate API key',
       message: error.message
@@ -307,7 +308,7 @@ router.post('/:id/toggle', authMiddleware, async (req, res) => {
       apiKey: result
     });
   } catch (error) {
-    console.error('Toggle API key error:', error);
+    logger.error('Toggle API key error:', error.message);
     res.status(500).json({
       error: 'Failed to toggle API key',
       message: error.message
@@ -338,7 +339,7 @@ router.get('/:id/reveal', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Reveal API key error:', error);
+    logger.error('Reveal API key error:', error.message);
     res.status(500).json({
       error: 'Failed to reveal API key',
       message: error.message
@@ -365,7 +366,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       message: 'API key deleted successfully'
     });
   } catch (error) {
-    console.error('Delete API key error:', error);
+    logger.error('Delete API key error:', error.message);
     res.status(500).json({
       error: 'Failed to delete API key',
       message: error.message

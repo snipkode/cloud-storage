@@ -1,4 +1,5 @@
 const { db } = require('./firebase-admin');
+const logger = require('./logger');
 
 const FILES_COLLECTION = 'files';
 const FOLDERS_COLLECTION = 'folders';
@@ -100,12 +101,12 @@ const deleteSubfolders = async (parentPath, userId, environment = 'live') => {
   try {
     // Get all folders that start with this path (direct children and deeper)
     const allFolders = await getUserFolders(userId, environment);
-    
+
     // Filter to only subfolders of parentPath
     const subfolders = allFolders.filter(f => {
       // Match paths like: /parent/child, /parent/child/grandchild
       // But not: /parent2 or /parent-something
-      return f.path.startsWith(parentPath + '/') && 
+      return f.path.startsWith(parentPath + '/') &&
              f.path.substring(parentPath.length + 1).split('/').length >= 1;
     });
 
@@ -114,10 +115,10 @@ const deleteSubfolders = async (parentPath, userId, environment = 'live') => {
 
     for (const subfolder of subfolders) {
       await db.collection(FOLDERS_COLLECTION).doc(subfolder.id).delete();
-      console.log(`[DeleteSubfolders] Deleted: ${subfolder.name} (${subfolder.id})`);
+      logger.debug(`[DeleteSubfolders] Deleted: ${subfolder.name} (${subfolder.id})`);
     }
   } catch (error) {
-    console.error('[DeleteSubfolders] Error:', error);
+    logger.error('[DeleteSubfolders] Error:', error.message);
     throw error;
   }
 };

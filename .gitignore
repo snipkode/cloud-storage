@@ -9,6 +9,7 @@ package-lock.json
 
 # Firebase credentials
 server/firebase-service-key.json
+server/data/api-keys.json
 client/src/lib/firebase-config.js
 
 # Build output

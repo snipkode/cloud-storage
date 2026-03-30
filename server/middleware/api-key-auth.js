@@ -1,6 +1,7 @@
 const { hashApiKey, isValidApiKeyFormat } = require('../lib/api-key-generator');
 const apiKeyStore = require('../lib/api-key-store');
 const { decrypt } = require('../lib/encryption');
+const logger = require('../lib/logger');
 
 /**
  * Middleware to validate API Key
@@ -79,7 +80,7 @@ const apiKeyMiddleware = async (req, res, next) => {
     if (apiKeyRecord.encryptedKey) {
       const decryptedKey = decrypt(apiKeyRecord.encryptedKey);
       if (!decryptedKey || decryptedKey !== apiKey) {
-        console.error('API key decryption mismatch');
+        logger.error('API key decryption mismatch');
         return res.status(401).json({
           error: 'Unauthorized',
           message: 'Invalid API key'
@@ -108,7 +109,7 @@ const apiKeyMiddleware = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('API Key middleware error:', error.message);
+    logger.error('API Key middleware error:', error.message);
     return res.status(500).json({
       error: 'Internal server error',
       message: 'Authentication failed'
@@ -122,15 +123,20 @@ const apiKeyMiddleware = async (req, res, next) => {
  */
 const requirePermission = (permission) => {
   return (req, res, next) => {
-    // If authenticated via Firebase token, allow access
+    // If authenticated via Firebase token, check role-based access
     if (req.user && req.user.authMethod === 'firebase') {
-      // For Firebase users, check if they have admin role
+      // For admin permission, require admin or super_admin role
       if (permission === 'admin') {
-        // Check for admin role in custom claims or allow specific admin users
-        // For now, allow all Firebase authenticated users for admin endpoints
-        // Can be restricted later based on custom claims
+        const userRole = req.user.role || 'user';
+        if (userRole !== 'admin' && userRole !== 'super_admin') {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: `Insufficient permissions. Required role: admin or super_admin, your role: ${userRole}`
+          });
+        }
         return next();
       }
+      // For other permissions, allow Firebase authenticated users
       return next();
     }
 

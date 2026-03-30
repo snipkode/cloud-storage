@@ -5,6 +5,7 @@ const fs = require('fs');
 const authMiddleware = require('@middleware/auth');
 const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-auth');
 const fileMetadataStore = require('@lib/file-metadata-store');
+const logger = require('@lib/logger');
 
 // Allowed file types for upload
 const ALLOWED_MIME_TYPES = [
@@ -217,12 +218,7 @@ router.post('/upload',
     const baseEnv = req.user.environment || 'live';
     const folderPath = req.body.folderPath; // Optional folder path
 
-    console.log(`[Upload] ========= `);
-    console.log(`[Upload] User: ${req.user.uid}`);
-    console.log(`[Upload] API Key Env: ${baseEnv}`);
-    console.log(`[Upload] Header Env: ${headerEnv || 'none'}`);
-    console.log(`[Upload] Request body folderPath: ${folderPath}`);
-    console.log(`[Upload] Request body:`, req.body);
+    logger.debug(`[Upload] User: ${req.user.uid}, Env: ${baseEnv}, Header Env: ${headerEnv || 'none'}, Folder: ${folderPath || '/'}`);
 
     // If user has API key with test env, they can only upload to test
     // If user has API key with live env, they can upload to either via header
@@ -237,9 +233,7 @@ router.post('/upload',
 
     // Use folderPath from request, default to '/'
     const savePath = folderPath || '/';
-    console.log(`[Upload] Using environment: ${env}`);
-    console.log(`[Upload] Saving file with path: ${savePath}`);
-    console.log(`[Upload] Physical file path: ${req.file.path}`);
+    logger.debug(`[Upload] Using environment: ${env}, Path: ${savePath}`);
 
     // Auto-create folder if path is not root and folder doesn't exist
     if (savePath && savePath !== '/' && savePath !== '.') {
@@ -259,10 +253,10 @@ router.post('/upload',
             userId: req.user.uid,
             environment: env
           });
-          console.log(`[Upload] Auto-created folder: ${folderName} at ${savePath}`);
+          logger.debug(`[Upload] Auto-created folder: ${folderName} at ${savePath}`);
         }
       } catch (folderError) {
-        console.error(`[Upload] Failed to auto-create folder:`, folderError.message);
+        logger.error(`[Upload] Failed to auto-create folder:`, folderError.message);
         // Continue with upload even if folder creation fails
       }
     }
@@ -278,8 +272,7 @@ router.post('/upload',
       environment: env
     });
 
-    console.log(`[Upload] Saved metadata:`, { path: fileMetadata.path, filename: fileMetadata.filename });
-    console.log(`[Upload] ========= `);
+    logger.debug(`[Upload] Saved metadata: ${fileMetadata.filename} to ${fileMetadata.path}`);
 
     res.status(201).json({
       message: 'File uploaded successfully',
@@ -295,7 +288,7 @@ router.post('/upload',
       }
     });
   } catch (error) {
-    console.error('Upload error:', error);
+    logger.error('Upload error:', error.message);
     res.status(500).json({ error: 'Upload failed' });
   }
 });
@@ -308,13 +301,8 @@ router.post('/upload-multiple',
   requirePermission('upload'),
   upload.array('files', 10), async (req, res) => {
   try {
-    console.log(`[Upload Multiple] >>> REQUEST RECEIVED <<<`);
-    console.log(`[Upload Multiple] Headers:`, req.headers);
-    console.log(`[Upload Multiple] Body:`, req.body);
-    console.log(`[Upload Multiple] Files:`, req.files);
-
     if (!req.files || req.files.length === 0) {
-      console.log(`[Upload Multiple] No files in request`);
+      logger.debug('[Upload Multiple] No files in request');
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
@@ -324,10 +312,7 @@ router.post('/upload-multiple',
     // Get folderPath from header only (simpler than query param)
     const folderPath = req.headers['x-folder-path'];
 
-    console.log(`[Upload Multiple] ========= `);
-    console.log(`[Upload Multiple] User: ${req.user?.uid || 'UNKNOWN'}`);
-    console.log(`[Upload Multiple] API Key Env: ${baseEnv}, Header Env: ${headerEnv || 'none'}`);
-    console.log(`[Upload Multiple] Header X-Folder-Path: ${folderPath || 'none'}`);
+    logger.debug(`[Upload Multiple] User: ${req.user?.uid || 'UNKNOWN'}, Env: ${baseEnv}, Folder: ${folderPath || '/'}, Files: ${req.files.length}`);
 
     // If user has API key with test env, they can only upload to test
     // If user has API key with live env, they can upload to either via header
@@ -342,8 +327,7 @@ router.post('/upload-multiple',
 
     // Use folderPath from header, default to '/'
     const savePath = folderPath || '/';
-    console.log(`[Upload Multiple] Using environment: ${env}`);
-    console.log(`[Upload Multiple] Saving files with path: ${savePath}`);
+    logger.debug(`[Upload Multiple] Using environment: ${env}, Path: ${savePath}`);
 
     // Auto-create folder if path is not root and folder doesn't exist
     if (savePath && savePath !== '/' && savePath !== '.') {
@@ -363,10 +347,10 @@ router.post('/upload-multiple',
             userId: req.user.uid,
             environment: env
           });
-          console.log(`[Upload Multiple] Auto-created folder: ${folderName} at ${savePath}`);
+          logger.debug(`[Upload Multiple] Auto-created folder: ${folderName} at ${savePath}`);
         }
       } catch (folderError) {
-        console.error(`[Upload Multiple] Failed to auto-create folder:`, folderError.message);
+        logger.error(`[Upload Multiple] Failed to auto-create folder:`, folderError.message);
         // Continue with upload even if folder creation fails
       }
     }
@@ -374,7 +358,6 @@ router.post('/upload-multiple',
     // Save all metadata to Firestore with folder path
     const uploadedFiles = [];
     for (const file of req.files) {
-      console.log(`[Upload Multiple] Processing file: ${file.filename}`);
       const fileMetadata = await fileMetadataStore.createFile({
         filename: file.filename,
         originalname: file.originalname,
@@ -384,7 +367,7 @@ router.post('/upload-multiple',
         path: savePath,
         environment: env
       });
-      console.log(`[Upload Multiple] Saved metadata for: ${file.filename}`);
+      logger.debug(`[Upload Multiple] Saved metadata for: ${file.filename}`);
       uploadedFiles.push({
         id: fileMetadata.id,
         filename: fileMetadata.filename,
@@ -397,20 +380,18 @@ router.post('/upload-multiple',
       });
     }
 
-    console.log(`[Upload Multiple] Uploaded ${uploadedFiles.length} files to ${savePath}`);
-    console.log(`[Upload Multiple] ========= `);
+    logger.debug(`[Upload Multiple] Uploaded ${uploadedFiles.length} files to ${savePath}`);
 
     res.status(201).json({
       message: `${uploadedFiles.length} file(s) uploaded successfully`,
       files: uploadedFiles
     });
   } catch (error) {
-    console.error('[Upload Multiple] ERROR:', error);
-    console.error('[Upload Multiple] Stack:', error.stack);
-    res.status(500).json({ 
+    logger.error('[Upload Multiple] ERROR:', error.message);
+    res.status(500).json({
       error: 'Upload failed',
-      details: error.message,
-      stack: error.stack
+      message: error.message,
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
     });
   }
 });
@@ -425,7 +406,7 @@ router.get('/files',
     const queryEnv = req.query.environment;
     const baseEnv = req.user.environment || 'live';
 
-    console.log(`[List Files] User: ${req.user.uid}, API Key Env: ${baseEnv}, Query Env: ${queryEnv || 'none'}`);
+    logger.debug(`[List Files] User: ${req.user.uid}, API Key Env: ${baseEnv}, Query Env: ${queryEnv || 'none'}`);
 
     // If user has API key with test env, they can only view test files
     // If user has API key with live env, they can view both via query param
@@ -438,7 +419,7 @@ router.get('/files',
       env = baseEnv;  // Default to API key environment
     }
 
-    console.log(`[List Files] Using environment: ${env}`);
+    logger.debug(`[List Files] Using environment: ${env}`);
 
     const files = await fileMetadataStore.getUserFiles(req.user.uid, env);
 
@@ -456,12 +437,12 @@ router.get('/files',
         // File doesn't exist, delete metadata
         await fileMetadataStore.deleteFile(file.filename, req.user.uid, env);
         deletedCount.count++;
-        console.log(`[List Files] Auto-deleted metadata for missing file: ${file.filename}`);
+        logger.debug(`[List Files] Auto-deleted metadata for missing file: ${file.filename}`);
       }
     }
-    
+
     if (deletedCount.count > 0) {
-      console.log(`[List Files] Cleaned up ${deletedCount.count} missing file(s)`);
+      logger.debug(`[List Files] Cleaned up ${deletedCount.count} missing file(s)`);
     }
 
     const totalSize = validFiles.reduce((sum, f) => sum + (f.size || 0), 0);
@@ -487,7 +468,7 @@ router.get('/files',
       cleanup: deletedCount.count > 0 ? { deleted: deletedCount.count } : undefined
     });
   } catch (error) {
-    console.error('List files error:', error);
+    logger.error('List files error:', error.message);
     res.status(500).json({ error: 'Failed to list files' });
   }
 });
@@ -502,7 +483,7 @@ router.get('/download/:filename',
     const queryEnv = req.query.environment;
     const baseEnv = req.user.environment || 'live';
 
-    console.log(`[Download] User: ${req.user.uid}, API Key Env: ${baseEnv}, Query Env: ${queryEnv}`);
+    logger.debug(`[Download] User: ${req.user.uid}, API Key Env: ${baseEnv}, Query Env: ${queryEnv || 'none'}`);
 
     // If user has API key with test env, they can only download from test
     // If user has API key with live env, they can download from either via query param
@@ -515,7 +496,7 @@ router.get('/download/:filename',
       env = baseEnv;  // Default to API key environment
     }
 
-    console.log(`[Download] Using environment: ${env}`);
+    logger.debug(`[Download] Using environment: ${env}`);
 
     // Sanitize filename to prevent path traversal attacks
     const filename = sanitizeFilename(req.params.filename);
@@ -532,14 +513,14 @@ router.get('/download/:filename',
       const otherFileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, otherEnv);
       const otherFilePath = findFilePath(req.user.uid, otherEnv, otherFileMetadata);
 
-      console.log(`[Download] File not found in ${env}, trying ${otherEnv}`);
+      logger.debug(`[Download] File not found in ${env}, trying ${otherEnv}`);
 
       if (otherFilePath) {
-        console.log(`[Download] Found file in ${otherEnv}`);
+        logger.debug(`[Download] Found file in ${otherEnv}`);
         env = otherEnv;
         filePath = otherFilePath;
       } else {
-        console.error(`[Download] File not found in either environment`);
+        logger.error(`[Download] File not found in either environment`);
         return res.status(404).json({
           error: 'File not found',
           details: `File ${filename} not found in ${env} or ${otherEnv}`
@@ -547,7 +528,7 @@ router.get('/download/:filename',
       }
     }
 
-    console.log(`[Download] File path: ${filePath}`);
+    logger.debug(`[Download] File path: ${filePath}`);
 
     // Update download count in Firestore
     await fileMetadataStore.incrementDownloadCount(filename, req.user.uid, env);
@@ -556,10 +537,10 @@ router.get('/download/:filename',
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(path.basename(filename))}"`);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
 
-    console.log(`[Download] Sending file: ${filename} from ${env}`);
+    logger.debug(`[Download] Sending file: ${filename} from ${env}`);
     res.download(filePath);
   } catch (error) {
-    console.error('Download error:', error);
+    logger.error('Download error:', error.message);
     res.status(500).json({ error: 'Download failed' });
   }
 });
@@ -595,14 +576,14 @@ router.delete('/delete/:filename',
     const filePath = findFilePath(req.user.uid, env, fileMetadata);
 
     if (!filePath) {
-      console.error(`[Delete] File not found in any location`);
+      logger.error(`[Delete] File not found in any location`);
       return res.status(404).json({
         error: 'File not found',
         details: `File ${filename} not found in user directory or subfolders`
       });
     }
 
-    console.log(`[Delete] Found file at: ${filePath}`);
+    logger.debug(`[Delete] Found file at: ${filePath}`);
 
     // Delete physical file
     fs.unlinkSync(filePath);
@@ -612,7 +593,7 @@ router.delete('/delete/:filename',
 
     res.json({ message: 'File deleted successfully' });
   } catch (error) {
-    console.error('Delete error:', error);
+    logger.error('Delete error:', error.message);
     res.status(500).json({ error: 'Delete failed' });
   }
 });
@@ -657,7 +638,7 @@ router.get('/file/:filename',
       }
     });
   } catch (error) {
-    console.error('Get file info error:', error);
+    logger.error('Get file info error:', error.message);
     res.status(500).json({ error: 'Failed to get file info' });
   }
 });
@@ -672,7 +653,7 @@ router.get('/storage-stats',
     const stats = await fileMetadataStore.getStorageStats(req.user.uid, env);
     res.json({ ...stats, environment: env });
   } catch (error) {
-    console.error('Storage stats error:', error);
+    logger.error('Storage stats error:', error.message);
     res.status(500).json({ error: 'Failed to get stats' });
   }
 });
@@ -737,7 +718,7 @@ router.post('/folders',
       environment: env
     });
 
-    console.log(`[Create Folder] User: ${req.user.uid}, Folder: ${folder.name}, Path: ${folder.path}, Env: ${env}`);
+    logger.debug(`[Create Folder] User: ${req.user.uid}, Folder: ${folder.name}, Path: ${folder.path}, Env: ${env}`);
 
     res.status(201).json({
       message: 'Folder created successfully',
@@ -751,7 +732,7 @@ router.post('/folders',
       }
     });
   } catch (error) {
-    console.error('Create folder error:', error);
+    logger.error('Create folder error:', error.message);
     res.status(500).json({ error: 'Failed to create folder' });
   }
 });
@@ -789,7 +770,7 @@ router.get('/folders',
       environment: env
     });
   } catch (error) {
-    console.error('List folders error:', error);
+    logger.error('List folders error:', error.message);
     res.status(500).json({ error: 'Failed to list folders' });
   }
 });
@@ -804,7 +785,7 @@ router.delete('/folders/:folderId',
     const queryEnv = req.query.environment;
     const baseEnv = req.user.environment || 'live';
 
-    console.log(`[Delete Folder] Request: folderId=${folderId}, queryEnv=${queryEnv}, baseEnv=${baseEnv}`);
+    logger.debug(`[Delete Folder] Request: folderId=${folderId}, queryEnv=${queryEnv || 'none'}, baseEnv=${baseEnv}`);
 
     let env;
     if (baseEnv === 'test') {
@@ -817,7 +798,7 @@ router.delete('/folders/:folderId',
 
     // Get folder to verify ownership
     const folder = await fileMetadataStore.getFolderById(folderId, env);
-    console.log(`[Delete Folder] Found folder:`, folder);
+    logger.debug(`[Delete Folder] Found folder: ${folder?.name || 'not found'}`);
 
     if (!folder) {
       return res.status(404).json({ error: 'Folder not found' });
@@ -829,7 +810,7 @@ router.delete('/folders/:folderId',
 
     // Get all files in this folder and subfolders
     const allFiles = await fileMetadataStore.getUserFiles(req.user.uid, env);
-    
+
     // Match files that are:
     // 1. Directly in this folder (path === folder.path)
     // 2. In subfolders (path starts with folder.path + '/')
@@ -837,8 +818,8 @@ router.delete('/folders/:folderId',
       if (!f.path) return false;
       return f.path === folder.path || f.path.startsWith(folder.path + '/');
     });
-    
-    console.log(`[Delete Folder] Found ${filesInFolder.length} files to delete`);
+
+    logger.debug(`[Delete Folder] Found ${filesInFolder.length} files to delete`);
 
     // Delete all files in the folder (physical + metadata)
     for (const file of filesInFolder) {
@@ -846,18 +827,18 @@ router.delete('/folders/:folderId',
         // Find physical file path
         const physicalFolderPath = getPhysicalFolderPath(req.user.uid, env, file.path);
         const filePath = path.join(physicalFolderPath, file.filename);
-        
+
         // Delete physical file
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
-          console.log(`[Delete Folder] Deleted physical file: ${filePath}`);
+          logger.debug(`[Delete Folder] Deleted physical file: ${filePath}`);
         }
-        
+
         // Delete metadata
         await fileMetadataStore.deleteFile(file.filename, req.user.uid, env);
-        console.log(`[Delete Folder] Deleted file metadata: ${file.filename}`);
+        logger.debug(`[Delete Folder] Deleted file metadata: ${file.filename}`);
       } catch (error) {
-        console.error(`[Delete Folder] Error deleting file ${file.filename}:`, error.message);
+        logger.error(`[Delete Folder] Error deleting file ${file.filename}:`, error.message);
       }
     }
 
@@ -869,15 +850,14 @@ router.delete('/folders/:folderId',
     // Delete the folder itself
     await fileMetadataStore.deleteFolder(folderId, req.user.uid, env);
 
-    console.log(`[Delete Folder] Success: User: ${req.user.uid}, Folder: ${folder.name}, Env: ${env}`);
-    console.log(`[Delete Folder] Deleted ${filesInFolder.length} files and ${folder.path ? 'subfolders' : 'no subfolders'}`);
+    logger.debug(`[Delete Folder] Success: Folder ${folder.name} deleted, ${filesInFolder.length} files removed`);
 
-    res.json({ 
+    res.json({
       message: 'Folder and all contents deleted successfully',
       deletedFilesCount: filesInFolder.length
     });
   } catch (error) {
-    console.error('Delete folder error:', error);
+    logger.error('Delete folder error:', error.message);
     res.status(500).json({ error: 'Failed to delete folder', details: error.message });
   }
 });

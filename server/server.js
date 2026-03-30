@@ -75,6 +75,17 @@ const authLimiter = rateLimit({
 
 app.use('/api/api-keys', authLimiter);
 
+// Stricter rate limit for download endpoints (prevent bandwidth abuse)
+const downloadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 downloads per 15 minutes
+  message: { error: 'Too many requests', message: 'Download limit exceeded. Please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/download', downloadLimiter);
+
 // Middleware
 app.use(express.json({ limit: '1mb' })); // Limit request size
 

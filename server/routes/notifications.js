@@ -3,6 +3,7 @@ const authMiddleware = require('@middleware/auth');
 const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-auth');
 const { requireRole } = require('@middleware/role');
 const notificationStore = require('@lib/notification-store');
+const logger = require('@lib/logger');
 
 // Combined auth middleware - supports both Firebase JWT and API Key
 const combinedAuth = (req, res, next) => {
@@ -35,7 +36,7 @@ router.get('/',
         total: notifications.length
       });
     } catch (error) {
-      console.error('Get notifications error:', error);
+      logger.error('Get notifications error:', error.message);
       res.status(500).json({ error: 'Failed to get notifications' });
     }
   }
@@ -56,7 +57,7 @@ router.get('/unread-count',
         unreadCount: count
       });
     } catch (error) {
-      console.error('Get unread count error:', error);
+      logger.error('Get unread count error:', error.message);
       res.status(500).json({ error: 'Failed to get unread count' });
     }
   }
@@ -79,7 +80,7 @@ router.post('/:id/read',
         res.status(404).json({ error: 'Notification not found' });
       }
     } catch (error) {
-      console.error('Mark as read error:', error);
+      logger.error('Mark as read error:', error.message);
       res.status(500).json({ error: 'Failed to mark notification as read' });
     }
   }
@@ -100,7 +101,7 @@ router.post('/read-all',
         message: `Marked ${count} notification(s) as read`
       });
     } catch (error) {
-      console.error('Mark all as read error:', error);
+      logger.error('Mark all as read error:', error.message);
       res.status(500).json({ error: 'Failed to mark notifications as read' });
     }
   }
@@ -123,7 +124,7 @@ router.delete('/:id',
         res.status(404).json({ error: 'Notification not found' });
       }
     } catch (error) {
-      console.error('Delete notification error:', error);
+      logger.error('Delete notification error:', error.message);
       res.status(500).json({ error: 'Failed to delete notification' });
     }
   }
@@ -134,7 +135,7 @@ router.delete('/:id',
  * POST /api/notifications/broadcast
  */
 router.post('/broadcast',
-  combinedAuth,
+  authMiddleware,
   requireRole('super_admin'),
   async (req, res) => {
     try {
@@ -158,7 +159,7 @@ router.post('/broadcast',
         notification
       });
     } catch (error) {
-      console.error('Broadcast error:', error);
+      logger.error('Broadcast error:', error.message);
       res.status(500).json({ error: 'Failed to send broadcast' });
     }
   }
@@ -169,7 +170,7 @@ router.post('/broadcast',
  * POST /api/notifications/send
  */
 router.post('/send',
-  combinedAuth,
+  authMiddleware,
   requireRole('super_admin'),
   async (req, res) => {
     try {
@@ -193,7 +194,7 @@ router.post('/send',
         notification
       });
     } catch (error) {
-      console.error('Send notification error:', error);
+      logger.error('Send notification error:', error.message);
       res.status(500).json({ error: 'Failed to send notification' });
     }
   }
@@ -204,7 +205,7 @@ router.post('/send',
  * GET /api/notifications/admin/all
  */
 router.get('/admin/all',
-  combinedAuth,
+  authMiddleware,
   requireRole('super_admin'),
   async (req, res) => {
     try {
@@ -216,7 +217,7 @@ router.get('/admin/all',
         total: notifications.length
       });
     } catch (error) {
-      console.error('Get all notifications error:', error);
+      logger.error('Get all notifications error:', error.message);
       res.status(500).json({ error: 'Failed to get notifications' });
     }
   }

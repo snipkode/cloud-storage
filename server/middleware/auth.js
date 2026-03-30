@@ -1,5 +1,6 @@
 const { admin } = require('../lib/firebase-admin');
 const { getUserRole } = require('./role');
+const logger = require('../lib/logger');
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -33,7 +34,7 @@ const authMiddleware = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Auth error:', error.message);
+    logger.error('Auth error:', error.message);
 
     if (error.code === 'auth/id-token-expired') {
       return res.status(401).json({ error: 'Token expired' });
