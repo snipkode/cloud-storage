@@ -8,6 +8,7 @@ const fileMetadataStore = require('@lib/file-metadata-store');
 const logger = require('@lib/logger');
 const { validateBody } = require('@lib/validation');
 const { z } = require('zod');
+const transcodeLib = require('@lib/transcode');
 
 // Allowed file types for upload
 const ALLOWED_MIME_TYPES = [
@@ -276,6 +277,21 @@ router.post('/upload',
 
     logger.debug(`[Upload] Saved metadata: ${fileMetadata.filename} to ${fileMetadata.path}`);
 
+    // Trigger background transcoding for video files
+    const filePath = req.file.path;
+    if (transcodeLib.needsTranscoding(req.file.originalname) && transcodeLib.TRANSCODE_CONFIG.enabled) {
+      logger.info(`[Upload] Queuing video for transcoding: ${req.file.originalname}`);
+      
+      // Transcode to default quality in background
+      transcodeLib.transcode(filePath, transcodeLib.TRANSCODE_CONFIG.quality, (err, outputPath) => {
+        if (err) {
+          logger.error(`[Upload] Transcode failed: ${err.message}`);
+        } else {
+          logger.info(`[Upload] Transcode complete: ${outputPath}`);
+        }
+      });
+    }
+
     res.status(201).json({
       message: 'File uploaded successfully',
       file: {
@@ -286,7 +302,8 @@ router.post('/upload',
         mimetype: fileMetadata.mimetype,
         createdAt: fileMetadata.createdAt,
         environment: env,
-        folderPath: savePath
+        folderPath: savePath,
+        transcoding: transcodeLib.needsTranscoding(req.file.originalname) ? 'pending' : 'not_required'
       }
     });
   } catch (error) {
@@ -544,6 +561,211 @@ router.get('/download/:filename',
   } catch (error) {
     logger.error('Download error:', error.message);
     res.status(500).json({ error: 'Download failed' });
+  }
+});
+
+// Stream video with HTTP Range support (for video player)
+// Optional query params: ?quality=480p|720p|1080p&environment=test|live
+router.get('/stream/:filename',
+  combinedAuth,
+  requirePermission('read'),
+  async (req, res) => {
+  try {
+    const queryEnv = req.query.environment;
+    const baseEnv = req.user.environment || 'live';
+    const quality = req.query.quality || '720p';
+
+    logger.debug(`[Stream] User: ${req.user.uid}, Env: ${baseEnv}, Quality: ${quality}`);
+
+    // Environment selection logic (same as download)
+    let env;
+    if (baseEnv === 'test') {
+      env = 'test';
+    } else if (queryEnv === 'test' || queryEnv === 'live') {
+      env = queryEnv;
+    } else {
+      env = baseEnv;
+    }
+
+    // Sanitize filename
+    const filename = sanitizeFilename(req.params.filename);
+
+    // Get file metadata from Firestore
+    const fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
+
+    // Find file in current environment
+    let filePath = findFilePath(req.user.uid, env, fileMetadata);
+
+    // If not found, try other environment
+    if (!filePath) {
+      const otherEnv = env === 'test' ? 'live' : 'test';
+      const otherFileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, otherEnv);
+      const otherFilePath = findFilePath(req.user.uid, otherEnv, otherFileMetadata);
+
+      if (otherFilePath) {
+        env = otherEnv;
+        filePath = otherFilePath;
+      } else {
+        return res.status(404).json({
+          error: 'File not found',
+          details: `File ${filename} not found`
+        });
+      }
+    }
+
+    logger.debug(`[Stream] File path: ${filePath}`);
+
+    // Check if file is a video that can be transcoded
+    const isVideo = fileMetadata?.mimetype?.includes('video') || 
+                    transcodeLib.needsTranscoding(filename);
+
+    // Try to use transcoded version if available and enabled
+    let streamPath = filePath;
+    if (isVideo && transcodeLib.TRANSCODE_CONFIG.enabled) {
+      const cachedPath = transcodeLib.getCachedPath(filePath, quality);
+      if (fs.existsSync(cachedPath)) {
+        streamPath = cachedPath;
+        logger.debug(`[Stream] Using transcoded cache: ${quality}`);
+      } else if (transcodeLib.needsTranscoding(filename)) {
+        // Start background transcode, but stream original for now
+        logger.info(`[Stream] Starting background transcode for: ${filename}`);
+        transcodeLib.transcode(filePath, quality, (err) => {
+          if (err) {
+            logger.error(`[Stream] Background transcode failed: ${err.message}`);
+          } else {
+            logger.info(`[Stream] Background transcode complete: ${filename}`);
+          }
+        });
+      }
+    }
+
+    // Get file stats
+    const stats = fs.statSync(streamPath);
+    const fileSize = stats.size;
+
+    // Determine content type
+    const ext = path.extname(filename).toLowerCase();
+    const contentTypes = {
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.ogg': 'video/ogg',
+      '.mov': 'video/quicktime',
+      '.avi': 'video/x-msvideo',
+      '.mkv': 'video/x-matroska',
+      '.flv': 'video/x-flv',
+      '.wmv': 'video/x-ms-wmv'
+    };
+    const contentType = contentTypes[ext] || 'application/octet-stream';
+
+    // Set headers for video streaming
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length');
+
+    // Handle HTTP Range requests (critical for video seeking)
+    const range = req.headers.range;
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunkSize = (end - start) + 1;
+
+      logger.debug(`[Stream] Range: ${start}-${end} (${chunkSize} bytes)`);
+
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+      res.setHeader('Content-Length', chunkSize);
+      res.status(206); // Partial Content
+
+      const stream = fs.createReadStream(streamPath, { start, end });
+      stream.pipe(res);
+    } else {
+      // No range header - send full file
+      res.setHeader('Content-Length', fileSize);
+      res.status(200);
+
+      const stream = fs.createReadStream(streamPath);
+      stream.pipe(res);
+    }
+
+    // Update view count (similar to download count)
+    await fileMetadataStore.incrementDownloadCount(filename, req.user.uid, env);
+
+  } catch (error) {
+    logger.error('Stream error:', error.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Streaming failed', details: error.message });
+    } else {
+      res.end();
+    }
+  }
+});
+
+// Get available streaming qualities for a video
+router.get('/stream/:filename/qualities',
+  combinedAuth,
+  requirePermission('read'),
+  async (req, res) => {
+  try {
+    const queryEnv = req.query.environment;
+    const baseEnv = req.user.environment || 'live';
+
+    let env = baseEnv === 'test' ? 'test' : (queryEnv || 'live');
+
+    const filename = sanitizeFilename(req.params.filename);
+    const fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
+
+    if (!fileMetadata) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const filePath = findFilePath(req.user.uid, env, fileMetadata);
+    if (!filePath) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Check which qualities are available
+    const availableQualities = ['original'];
+    const qualities = ['480p', '720p', '1080p'];
+
+    if (transcodeLib.TRANSCODE_CONFIG.enabled) {
+      qualities.forEach((q) => {
+        if (transcodeLib.hasCache(filePath, q)) {
+          availableQualities.push(q);
+        }
+      });
+    }
+
+    // Get original video metadata if possible
+    let originalInfo = {};
+    try {
+      const metadata = await transcodeLib.getVideoMetadata(filePath);
+      originalInfo = {
+        duration: metadata.duration,
+        resolution: metadata.resolution,
+        codec: metadata.codec
+      };
+    } catch (e) {
+      // Metadata extraction failed, use basic info
+    }
+
+    res.json({
+      filename,
+      original: {
+        quality: 'original',
+        available: true,
+        ...originalInfo
+      },
+      transcoded: qualities.map((q) => ({
+        quality: q,
+        available: availableQualities.includes(q),
+        cached: transcodeLib.hasCache(filePath, q)
+      })),
+      transcodingEnabled: transcodeLib.TRANSCODE_CONFIG.enabled
+    });
+
+  } catch (error) {
+    logger.error('Get qualities error:', error.message);
+    res.status(500).json({ error: 'Failed to get available qualities' });
   }
 });
 

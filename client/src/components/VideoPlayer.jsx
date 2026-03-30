@@ -1,13 +1,20 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize, FiMinimize,
-  FiSkipBack, FiSkipForward, FiSettings, FiDownload, FiFilm
+  FiSkipBack, FiSkipForward, FiSettings, FiDownload, FiFilm, FiCast
 } from 'react-icons/fi';
 
 /**
  * Beautiful compact video player with advanced controls
+ * Supports streaming with transcoding and quality selection
  */
-export const VideoPlayer = ({ src, filename, onDownload }) => {
+export const VideoPlayer = ({ 
+  src, 
+  filename, 
+  onDownload,
+  enableStreaming = true,
+  apiBase = '' 
+}) => {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -22,8 +29,64 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
   const [hasError, setHasError] = useState(false);
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState(null);
   const [errorCount, setErrorCount] = useState(0);
+  
+  // Streaming & quality state
+  const [availableQualities, setAvailableQualities] = useState([]);
+  const [selectedQuality, setSelectedQuality] = useState('auto');
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [isTranscoding, setIsTranscoding] = useState(false);
 
   const controlTimeoutRef = useRef(null);
+
+  // Fetch available qualities when src changes
+  useEffect(() => {
+    if (src && enableStreaming && filename && apiBase) {
+      fetchQualities();
+    }
+  }, [src, filename, apiBase, enableStreaming]);
+
+  // Fetch available streaming qualities
+  const fetchQualities = async () => {
+    try {
+      // Extract just the filename from the full URL if needed
+      const cleanFilename = filename.split('/').pop();
+      const response = await fetch(`${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}/qualities`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('firebaseToken')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const qualities = [{ quality: 'original', label: 'Original', available: true }];
+        
+        data.transcoded?.forEach((q) => {
+          if (q.available) {
+            qualities.push({ 
+              quality: q.quality, 
+              label: q.quality,
+              available: true,
+              cached: q.cached
+            });
+          }
+        });
+        
+        setAvailableQualities(qualities);
+        setIsTranscoding(qualities.length === 1); // Only original = still transcoding
+      }
+    } catch (error) {
+      console.debug('[VideoPlayer] Failed to fetch qualities:', error.message);
+    }
+  };
+
+  // Get streaming URL based on selected quality
+  const getStreamUrl = useCallback(() => {
+    if (!enableStreaming || !filename) return src;
+    
+    const cleanFilename = filename.split('/').pop();
+    const qualityParam = selectedQuality !== 'auto' ? `&quality=${selectedQuality}` : '';
+    return `${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}?t=${Date.now()}${qualityParam}`;
+  }, [enableStreaming, filename, selectedQuality, apiBase, src]);
 
   // Format time as mm:ss
   const formatTime = (seconds) => {
@@ -246,6 +309,15 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Close quality menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setShowQualityMenu(false);
+    if (showQualityMenu) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showQualityMenu]);
+
   // Progress percentage
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -277,7 +349,7 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
       {/* Video element with thumbnail poster */}
       <video
         ref={videoRef}
-        src={src}
+        src={getStreamUrl()}
         poster={thumbnailDataUrl || undefined}
         className="w-full h-full object-contain"
         onTimeUpdate={handleTimeUpdate}
@@ -309,6 +381,11 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
             <div className="w-14 h-14 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
             <p className="text-white/80 text-sm font-medium">Loading video...</p>
             <p className="text-white/50 text-xs mt-1">{filename}</p>
+            {isTranscoding && (
+              <p className="text-indigo-400 text-xs mt-2 flex items-center justify-center gap-1">
+                <FiCast className="animate-pulse" /> Transcoding...
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -385,7 +462,72 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
           </div>
 
           {/* Right controls */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 relative">
+            {/* Quality selector - only show if streaming enabled and qualities available */}
+            {enableStreaming && availableQualities.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    setShowQualityMenu(!showQualityMenu);
+                  }}
+                  className="px-2 py-1 hover:bg-white/10 rounded-lg transition-colors text-white text-xs font-medium min-w-[40px] flex items-center gap-1"
+                  title="Quality"
+                >
+                  <FiCast className="text-xs" />
+                  {selectedQuality === 'auto' ? 'AUTO' : selectedQuality.toUpperCase()}
+                </button>
+                
+                {/* Quality menu dropdown */}
+                {showQualityMenu && (
+                  <div 
+                    className="absolute bottom-full right-0 mb-2 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-lg py-1 min-w-[100px] z-50"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Auto quality option */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedQuality('auto');
+                        setShowQualityMenu(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-white/10 transition-colors flex items-center justify-between ${
+                        selectedQuality === 'auto' ? 'text-indigo-400' : 'text-white'
+                      }`}
+                    >
+                      Auto
+                      {selectedQuality === 'auto' && <span className="text-indigo-400">✓</span>}
+                    </button>
+                    
+                    {/* Available qualities */}
+                    {availableQualities.map((q) => (
+                      <button
+                        key={q.quality}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedQuality(q.quality);
+                          setShowQualityMenu(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-xs hover:bg-white/10 transition-colors flex items-center justify-between ${
+                          selectedQuality === q.quality ? 'text-indigo-400' : 'text-white'
+                        }`}
+                      >
+                        {q.label}
+                        {selectedQuality === q.quality && <span className="text-indigo-400">✓</span>}
+                      </button>
+                    ))}
+                    
+                    {isTranscoding && (
+                      <div className="px-3 py-2 text-xs text-slate-400 border-t border-white/10 mt-1 pt-2">
+                        <FiCast className="inline animate-spin mr-1" />
+                        Transcoding...
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Download */}
             {onDownload && (
               <button

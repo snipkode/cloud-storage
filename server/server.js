@@ -173,6 +173,8 @@ Storage:
   POST   /api/upload-multiple - Upload multiple
   GET    /api/files           - List files
   GET    /api/download/:name  - Download
+  GET    /api/stream/:name    - Stream video (with transcoding)
+  GET    /api/stream/:name/qualities - Get available qualities
   GET    /api/file/:name      - File info
   DELETE /api/delete/:name    - Delete
   GET    /api/storage-stats   - Usage stats
