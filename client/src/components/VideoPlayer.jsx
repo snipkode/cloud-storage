@@ -41,7 +41,6 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
     if (isPlaying) {
       controlTimeoutRef.current = setTimeout(() => {
         setShowControls(false);
-        setShowSettings(false);
       }, 2500);
     }
   }, [isPlaying]);
