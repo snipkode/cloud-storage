@@ -49,9 +49,7 @@ export const VideoPlayer = ({
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isTranscoding, setIsTranscoding] = useState(false);
   const [currentStreamUrl, setCurrentStreamUrl] = useState(null);
-  const [useFallbackSrc, setUseFallbackSrc] = useState(false);
-  const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
-  const [isPortrait, setIsPortrait] = useState(false);
+  const [useFallbackSrc, setUseFallbackSrc] = useState(false); // Fallback to direct src if streaming fails
 
   const controlTimeoutRef = useRef(null);
 
@@ -210,20 +208,12 @@ export const VideoPlayer = ({
     const video = videoRef.current;
     setDuration(video?.duration || 0);
     setIsLoading(false);
-    
-    // Detect video dimensions and orientation
-    const width = video?.videoWidth || 0;
-    const height = video?.videoHeight || 0;
-    setVideoDimensions({ width, height });
-    setIsPortrait(height > width);
-    
     console.log('[VideoPlayer] Metadata loaded:', {
       readyState: video?.readyState,
       networkState: video?.networkState,
       duration: video?.duration,
-      videoWidth: width,
-      videoHeight: height,
-      isPortrait: height > width,
+      videoWidth: video?.videoWidth,
+      videoHeight: video?.videoHeight,
       src: video?.src?.substring(0, 100),
       canPlayType: video?.canPlayType?.('video/mp4')
     });
@@ -632,9 +622,7 @@ export const VideoPlayer = ({
   return (
     <div
       ref={containerRef}
-      className={`relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] ${
-        isPortrait ? 'max-h-[70vh]' : 'aspect-video'
-      }`}
+      className="relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] aspect-video"
       onMouseMove={(e) => { e.stopPropagation(); resetControlTimeout(); }}
       onClick={(e) => {
         e.stopPropagation();
