@@ -1,0 +1,55 @@
+# =========================================
+# Cloud Storage Samba Configuration Template
+# Copy this to samba-config/smb.conf
+# =========================================
+
+[global]
+   workgroup = WORKGROUP
+   server string = Cloud Storage Samba Server
+   security = user
+   map to guest = Bad User
+   dns proxy = no
+   log file = /var/log/samba/log.%m
+   max log size = 1000
+   logging = file
+   load printers = no
+   cups options = raw
+   
+   # Performance tuning
+   socket options = TCP_NODELAY IPTOS_LOWDELAY
+   read raw = yes
+   write raw = yes
+   use sendfile = yes
+   aio read size = 16384
+   aio write size = 16384
+
+# Production Uploads Share
+[cloud-storage]
+   comment = Cloud Storage - Production Files
+   path = /shares/uploads
+   valid users = @users
+   public = no
+   writable = yes
+   browsable = yes
+   create mask = 0775
+   directory mask = 0775
+   force create mode = 0664
+   force directory mode = 0775
+   inherit permissions = yes
+   vfs objects = acl_xattr
+   map acl inherit = Yes
+   store dos attributes = yes
+
+# Test Environment Share
+[cloud-storage-test]
+   comment = Cloud Storage - Test Files
+   path = /shares/test-uploads
+   valid users = @users
+   public = no
+   writable = yes
+   browsable = yes
+   create mask = 0775
+   directory mask = 0775
+   force create mode = 0664
+   force directory mode = 0775
+   inherit permissions = yes

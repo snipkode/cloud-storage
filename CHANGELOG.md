@@ -1,5 +1,97 @@
 # Changelog
 
+## 2026-03-30 - Samba (SMB/CIFS) Integration
+
+### 🗄️ New Feature: Samba Integration
+
+Full Samba/SMB integration for network file sharing access to cloud storage files.
+
+#### Features
+
+- **Samba Service Management** - Start, stop, restart, reload via API
+- **User Management** - Add, remove, enable, disable Samba users
+- **User Sync** - Sync app users to Samba users automatically
+- **Configuration Management** - Generate, deploy, test Samba config
+- **Multi-Share Support** - Separate shares for production and test environments
+- **Audit Logging** - Full audit trail for Samba operations
+- **Performance Tuning** - Optimized SMB3 settings for fast transfers
+
+#### API Endpoints
+
+| Endpoint | Method | Permission | Description |
+|----------|--------|------------|-------------|
+| `/api/samba/status` | GET | Admin | Get Samba service status |
+| `/api/samba/config` | GET | Admin | Generate and preview config |
+| `/api/samba/config/deploy` | POST | Admin | Deploy Samba configuration |
+| `/api/samba/restart` | POST | Admin | Restart Samba service |
+| `/api/samba/reload` | POST | Admin | Reload configuration |
+| `/api/samba/users` | GET | Admin | List Samba users |
+| `/api/samba/users` | POST | Admin | Add Samba user |
+| `/api/samba/users/:username` | DELETE | Admin | Remove Samba user |
+| `/api/samba/users/:username/toggle` | POST | Admin | Enable/disable user |
+| `/api/samba/users/sync` | POST | Admin | Sync app users to Samba |
+| `/api/samba/setup` | POST | Super Admin | Complete Samba setup |
+| `/api/samba/help` | GET | Any | Get connection instructions |
+
+#### Files Created
+
+- `server/lib/samba.js` - Samba integration module
+- `server/routes/samba.js` - Samba management API routes
+- `docker-compose.samba.yml` - Docker Compose with Samba support
+- `samba-config/smb.conf.template` - Samba configuration template
+- `docs/SAMBA_INTEGRATION.md` - Complete integration guide
+
+#### Connection Methods
+
+**Windows:** `\\SERVER_IP\cloud-storage`  
+**macOS:** `smb://SERVER_IP/cloud-storage`  
+**Linux:** `mount -t cifs //SERVER_IP/cloud-storage /mnt/storage`
+
+### Updated Files
+
+- `server/server.js` - Added Samba routes
+- `server/package.json` - Ready for Samba dependencies
+- `CHANGELOG.md` - This changelog entry
+
+### Requirements
+
+- Docker & Docker Compose
+- Samba container (dperson/samba:latest)
+- Ports: 139, 445 (TCP), 137, 138 (UDP)
+- Network access from clients
+
+### Security Features
+
+- User authentication required
+- Role-based access control (Admin only)
+- Encrypted SMB3 connections supported
+- Audit logging for all operations
+- Network isolation recommended
+- Firewall configuration required
+
+### Usage Example
+
+```bash
+# Start with Samba support
+docker-compose -f docker-compose.yml -f docker-compose.samba.yml up -d
+
+# Add Samba user
+docker exec -it cloud-storage-samba smbpasswd -a admin
+
+# Connect from Windows
+\\192.168.1.100\cloud-storage
+
+# Check status via API
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:3000/api/samba/status
+```
+
+### Documentation
+
+See `docs/SAMBA_INTEGRATION.md` for complete setup and usage guide.
+
+---
+
 ## 2026-03-30 - Security Hardening Update (P2 Complete)
 
 ### 🔒 Security Improvements

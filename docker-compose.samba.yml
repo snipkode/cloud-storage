@@ -1,0 +1,91 @@
+# Docker Compose with Samba Integration
+# This extends the base docker-compose.yml with Samba support
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cloud-storage-app
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Firebase credentials (use secrets in production)
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+      - API_KEY_ENCRYPTION_KEY=${API_KEY_ENCRYPTION_KEY}
+      # Samba configuration
+      - SAMBA_ENABLED=true
+      - SAMBA_UPLOADS_DIR=/app/uploads
+      - SAMBA_TEST_UPLOADS_DIR=/app/test-uploads
+      - SAMBA_SHARE_NAME=cloud-storage
+      - SAMBA_SERVER_IP=${SAMBA_SERVER_IP:-192.168.1.100}
+    volumes:
+      - uploads_data:/app/uploads
+      - test_uploads_data:/app/test-uploads
+      - ./server/logs:/app/server/logs
+    ports:
+      - "3000:3000"
+    networks:
+      - cloud-network
+    restart: unless-stopped
+    depends_on:
+      - samba
+
+  samba:
+    image: dperson/samba:latest
+    container_name: cloud-storage-samba
+    environment:
+      - TZ=UTC
+      - NMBD=true
+      - USER=admin;password123
+      - GROUP=users
+    volumes:
+      - uploads_data:/shares/uploads
+      - test_uploads_data:/shares/test-uploads
+      - ./samba-config/smb.conf:/etc/samba/smb.conf:ro
+    ports:
+      - "139:139/tcp"
+      - "445:445/tcp"
+      - "137:137/udp"
+      - "138:138/udp"
+    networks:
+      - cloud-network
+    cap_add:
+      - CAP_NET_ADMIN
+      - CAP_SYS_ADMIN
+    restart: unless-stopped
+
+  # Optional: Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: cloud-storage-nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - cloud-network
+    depends_on:
+      - app
+    restart: unless-stopped
+    profiles:
+      - with-nginx
+
+volumes:
+  uploads_data:
+    driver: local
+    name: cloud-storage-uploads
+  test_uploads_data:
+    driver: local
+    name: cloud-storage-test-uploads
+
+networks:
+  cloud-network:
+    driver: bridge
+    name: cloud-storage-network

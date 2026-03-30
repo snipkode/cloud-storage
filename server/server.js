@@ -21,6 +21,7 @@ moduleAlias.addAliases({
 const apiRoutes = require('./routes/api');
 const apiKeyRoutes = require('./routes/api-keys');
 const notificationRoutes = require('./routes/notifications');
+const sambaRoutes = require('./routes/samba');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -98,6 +99,7 @@ app.use(requestLogger);
 app.use('/api', apiRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/samba', sambaRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
