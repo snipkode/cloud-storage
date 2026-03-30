@@ -1,123 +1,103 @@
 # Changelog
 
-## 2026-03-30 - Super Admin Seed Script
+## 2026-03-30 - Google Auth Admin Management
 
-### 🌱 New Feature: One-Time Seed Script
+### 🔐 Super Admin Management for Google Sign-In
 
-Automated script untuk membuat user **super_admin** pertama dengan keamanan maksimal.
+Scripts untuk grant/revoke super_admin role ke user Google Auth.
 
 #### Features
 
-- **One-Time Execution** - Hanya bisa dijalankan sekali
-- **Automatic Check** - Verifikasi apakah super_admin sudah ada
-- **Secure Password** - Generate temporary password 16 karakter
-- **Credential Safety** - Simpan credentials ke file (hapus setelah digunakan)
-- **Marker Document** - Firestore document mencegah re-run
-- **Interactive CLI** - Prompt untuk email, nama, dan konfirmasi
-- **Verification Tool** - Script terpisah untuk cek status seed
+- **Google Auth Compatible** - Works with existing Google Sign-In users
+- **Custom Claims** - Firebase Auth custom claims for security
+- **Audit Logging** - All changes logged to Firestore
+- **Last Admin Protection** - Cannot revoke the last super_admin
+- **Interactive CLI** - Email-based role management
 
 #### Scripts
 
-**`scripts/seed-super-admin.js`** - Main seed script
-- Checks for existing super_admin
-- Creates Firebase Auth user
-- Creates Firestore user document with `super_admin` role
-- Generates secure temporary password
-- Saves credentials to file
+**`scripts/set-super-admin.js`** - Grant super_admin role
+- Finds user by email in Firebase Auth
+- Sets custom claims
+- Updates Firestore user document
+- Creates audit log entry
 
-**`scripts/verify-seed.js`** - Verification script
-- Checks seed marker document
-- Lists all admin users
-- Displays seed information
+**`scripts/revoke-super-admin.js`** - Revoke super_admin role
+- Removes custom claims
+- Downgrades role to "user"
+- Prevents revoking last super_admin
+- Creates audit log entry
+
+**`scripts/verify-seed.js`** - List all admins
+- Shows all super_admin users
+- Displays grant timestamps
+- Lists all admin-level users
 
 #### NPM Scripts
 
 ```bash
 cd server
 
-# Create super_admin (one-time only)
-npm run seed:admin
+# Grant super_admin role
+npm run auth:set-superadmin admin@example.com
 
-# Verify seed status
-npm run verify:seed
+# Revoke super_admin role
+npm run auth:revoke-superadmin admin@example.com
+
+# List all super_admins
+npm run auth:list-admins
 ```
 
-#### Usage Example
+#### Usage Flow
 
-```bash
-# Run seed script
-npm run seed:admin
-
-# Interactive prompts:
-Enter super_admin email: admin@example.com
-Enter super_admin name: System Administrator
-Create super_admin user "admin@example.com"? (yes/no): yes
-
-# Output:
-✅ Super Admin user created successfully!
-══════════════════════════════════════════════
-📧 Email:     admin@example.com
-👤 Name:      System Administrator
-🔑 Password:  x7k9m2p4!@#
-🎭 Role:      super_admin
-══════════════════════════════════════════════
-
-⚠️  IMPORTANT: Change password after first login!
+```
+1. User login via Google Sign-In
+   ↓
+2. Admin runs script:
+   npm run auth:set-superadmin admin@example.com
+   ↓
+3. User logout & login again
+   ↓
+4. User now has super_admin access!
 ```
 
 #### Security Features
 
-1. **Single Use** - Script creates marker document to prevent re-run
-2. **Credential Protection** - Credentials file added to `.gitignore`
-3. **Temporary Password** - Must be changed after first login
-4. **Firebase Auth Integration** - Uses official Firebase Admin SDK
-5. **Validation** - Email and name validation before creation
+1. **Custom Claims** - Firebase-signed claims in ID token
+2. **Firestore Role** - Document-based role storage
+3. **Audit Trail** - All changes logged to `admin_logs` collection
+4. **Last Admin Protection** - Prevents system lockout
+5. **Email Validation** - Must be valid Google account
 
 #### Files Created
 
-- `scripts/seed-super-admin.js` - Main seed script (200+ lines)
-- `scripts/verify-seed.js` - Verification script (80+ lines)
-- `docs/SEED_ADMIN.md` - Complete documentation
-- `server/package.json` - Added npm scripts
+- `scripts/set-super-admin.js` - Grant role script
+- `scripts/revoke-super-admin.js` - Revoke role script
+- `scripts/verify-seed.js` - Verification script (updated)
+- `docs/GOOGLE_AUTH_ADMIN.md` - Complete documentation
 
-#### Firestore Collections
+#### Firestore Structure
 
-**New Documents:**
-- `system/super_admin_seed` - Marker document (prevents re-run)
-- `users/{uid}` - User document with super_admin role
-
-**User Document Structure:**
+**users/{uid}:**
 ```javascript
 {
   email: "admin@example.com",
-  displayName: "System Administrator",
   role: "super_admin",
-  createdAt: "2026-03-30T10:15:30.000Z",
-  updatedAt: "2026-03-30T10:15:30.000Z",
-  createdBy: "seed-script",
-  isSuperAdmin: true
+  isSuperAdmin: true,
+  roleGrantedAt: timestamp,
+  roleGrantedBy: "auth:set-superadmin-script",
+  authProvider: "google.com"
 }
 ```
 
-#### Post-Seed Steps
-
-1. ✅ **Save credentials** - Simpan email dan password
-2. ✅ **Login** - Login dengan credentials
-3. ✅ **Change password** - Ubah password di pengaturan
-4. ✅ **Delete credentials file** - Hapus file setelah disimpan
-
-#### Verification
-
-```bash
-npm run verify:seed
-
-# Output:
-✅ Super Admin has been seeded
-──────────────────────────────────
-Seeded At:   2026-03-30T10:15:30.000Z
-Email:       admin@example.com
-UID:         Qi82fxj0G2NaiphOG3V6ce8dWe73
-──────────────────────────────────
+**admin_logs/{id}:**
+```javascript
+{
+  action: "grant_super_admin",
+  targetUserEmail: "admin@example.com",
+  timestamp: timestamp,
+  details: { previousRole: "user", newRole: "super_admin" }
+}
 ```
 
 ---

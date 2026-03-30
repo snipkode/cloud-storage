@@ -1,10 +1,11 @@
 /**
- * Verify Super Admin Seed Status
+ * Verify Super Admin Status
  * 
- * Check if super_admin has been seeded and display info
+ * Check and list all super_admin users in the system
  * 
  * Usage:
  *   node scripts/verify-seed.js
+ *   node scripts/verify-seed.js --list
  */
 
 require('dotenv').config({ path: '.env' });
@@ -29,46 +30,36 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-async function verifySeed() {
+async function verifySuperAdmins() {
   try {
-    console.log('\n🔍 Checking super_admin seed status...\n');
+    console.log('\n🔍 Checking super_admin status...\n');
 
-    // Check system marker document
-    const seedDoc = await db.collection('system').doc('super_admin_seed').get();
-    
-    if (seedDoc.exists) {
-      const data = seedDoc.data();
-      console.log('✅ Super Admin has been seeded\n');
-      console.log('─'.repeat(50));
-      console.log('Seeded At:  ', data.seededAt);
-      console.log('Email:      ', data.email);
-      console.log('UID:        ', data.uid);
-      console.log('─'.repeat(50));
+    // Get all super_admin users
+    const superAdminsSnapshot = await db.collection('users')
+      .where('role', '==', 'super_admin')
+      .get();
+
+    if (superAdminsSnapshot.empty) {
+      console.log('⚠️  No super_admin users found!\n');
+      console.log('📝 To create a super_admin:');
+      console.log('   1. User must login via Google Sign-In first');
+      console.log('   2. Run: npm run auth:set-superadmin <email>\n');
     } else {
-      console.log('⚠️  No seed marker found\n');
+      console.log('✅ Super Admin Users Found:\n');
+      console.log('═'.repeat(70));
       
-      // Check if any super_admin exists
-      const usersSnapshot = await db.collection('users')
-        .where('role', '==', 'super_admin')
-        .get();
-
-      if (usersSnapshot.empty) {
-        console.log('ℹ️  No super_admin users found in database.');
-        console.log('\n📝 Run the seed script to create the first super_admin:');
-        console.log('   node scripts/seed-super-admin.js\n');
-      } else {
-        console.log('⚠️  Super_admin users exist but no seed marker found.');
-        console.log('   This might mean the seed script was not used.\n');
-        
-        usersSnapshot.forEach(doc => {
-          const user = doc.data();
-          console.log(`   - ${user.email} (${doc.id})`);
-        });
+      superAdminsSnapshot.forEach(doc => {
+        const user = doc.data();
+        console.log(`👑 ${user.email}`);
+        console.log(`   Name: ${user.displayName || 'N/A'}`);
+        console.log(`   UID: ${doc.id}`);
+        console.log(`   Granted: ${user.roleGrantedAt || user.createdAt || 'N/A'}`);
+        console.log(`   Provider: ${user.authProvider || 'google.com'}`);
         console.log('');
-      }
+      });
     }
 
-    // List all admin users
+    // List all admin users (admin + super_admin)
     console.log('📋 All Admin Users:\n');
     const adminUsersSnapshot = await db.collection('users')
       .where('role', 'in', ['admin', 'super_admin'])
@@ -77,10 +68,11 @@ async function verifySeed() {
     if (adminUsersSnapshot.empty) {
       console.log('   No admin users found.\n');
     } else {
-      console.log('─'.repeat(50));
+      console.log('─'.repeat(70));
       adminUsersSnapshot.forEach(doc => {
         const user = doc.data();
-        console.log(`   ${user.role === 'super_admin' ? '👑' : '🛡️'}  ${user.email}`);
+        const icon = user.role === 'super_admin' ? '👑' : '🛡️';
+        console.log(`   ${icon}  ${user.email}`);
         console.log(`      Role: ${user.role}`);
         console.log(`      Created: ${user.createdAt || 'N/A'}`);
         console.log('');
@@ -93,4 +85,4 @@ async function verifySeed() {
   }
 }
 
-verifySeed();
+verifySuperAdmins();
