@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FiKey, FiFolder, FiBell, FiMenu, FiX, FiLogOut } from 'react-icons/fi';
+import { FiKey, FiFolder, FiBell, FiMenu, FiX, FiLogOut, FiShield } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
 import ApiKeys from '@pages/ApiKeys';
+import AdminDashboard from '@pages/AdminDashboard';
+import Broadcast from '@pages/Broadcast';
 import FileBrowser from '@components/FileBrowser';
 import NotificationPanel from '@components/NotificationPanel';
 
@@ -42,6 +44,10 @@ function Dashboard() {
     { id: 'files', label: 'Files', icon: FiFolder },
     { id: 'api-keys', label: 'API Keys', icon: FiKey },
   ];
+
+  // Filter nav items based on user role
+  const showAdminNav = user?.role === 'admin' || user?.role === 'super_admin';
+  const showBroadcastNav = user?.role === 'super_admin';
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -124,6 +130,44 @@ function Dashboard() {
                 </button>
               ))}
             </nav>
+
+            {/* Admin Navigation */}
+            {(showAdminNav || showBroadcastNav) && (
+              <>
+                <div className="my-3 border-t border-white/10"></div>
+                <div className="px-3 py-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin</p>
+                </div>
+                <nav className="space-y-1 mt-1">
+                  {showAdminNav && (
+                    <button
+                      onClick={() => setCurrentPage('admin')}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        currentPage === 'admin'
+                          ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <FiShield className={`text-base ${currentPage === 'admin' ? 'text-indigo-400' : ''}`} />
+                      Admin Panel
+                    </button>
+                  )}
+                  {showBroadcastNav && (
+                    <button
+                      onClick={() => setCurrentPage('broadcast')}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        currentPage === 'broadcast'
+                          ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <FiBroadcast className={`text-base ${currentPage === 'broadcast' ? 'text-indigo-400' : ''}`} />
+                      Broadcast
+                    </button>
+                  )}
+                </nav>
+              </>
+            )}
 
             {/* Storage Info */}
             <div className="mt-6 px-2">
@@ -230,8 +274,14 @@ function Dashboard() {
             <div className="animate-fade-in-up">
               {currentPage === 'files' ? (
                 <FileBrowser />
-              ) : (
+              ) : currentPage === 'api-keys' ? (
                 <ApiKeys />
+              ) : currentPage === 'admin' ? (
+                <AdminDashboard />
+              ) : currentPage === 'broadcast' ? (
+                <Broadcast />
+              ) : (
+                <FileBrowser />
               )}
             </div>
           </div>
