@@ -7,7 +7,10 @@
     "start": "node -r module-alias/register server.js",
     "dev": "nodemon -r module-alias/register server.js",
     "seed:admin": "node ../scripts/seed-super-admin.js",
-    "verify:seed": "node ../scripts/verify-seed.js"
+    "set:superadmin": "node ../scripts/set-super-admin.js",
+    "revoke:superadmin": "node ../scripts/revoke-super-admin.js",
+    "verify:seed": "node ../scripts/verify-seed.js",
+    "list:admins": "node ../scripts/verify-seed.js --list"
   },
   "_moduleAliases": {
     "@routes": "./routes",
