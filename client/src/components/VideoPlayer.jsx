@@ -438,7 +438,7 @@ export const VideoPlayer = ({
   return (
     <div
       ref={containerRef}
-      className="relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] min-h-[350px]"
+      className="relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] aspect-video"
       onMouseMove={(e) => { e.stopPropagation(); resetControlTimeout(); }}
       onClick={(e) => {
         e.stopPropagation();
