@@ -7,6 +7,7 @@ import {
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useFilesStore } from '@store/filesStore';
+import { VideoPlayer } from './VideoPlayer';
 
 /**
  * Environment toggle component to switch between Test/Live mode
@@ -159,12 +160,17 @@ function FileBrowser() {
       const loadCurrentPreview = async () => {
         setPreviewLoading(true);
         const file = previewFiles[previewIndex];
-        
+
+        // Reset zoom for non-image files
+        if (file.mimetype?.includes('video') || file.mimetype?.includes('pdf')) {
+          setZoom(1);
+        }
+
         // Clean up old URL
         if (previewUrl) {
           URL.revokeObjectURL(previewUrl);
         }
-        
+
         const url = await getPreviewUrl(file);
         setPreviewUrl(url);
         setPreviewLoading(false);
@@ -546,13 +552,14 @@ function FileBrowser() {
     }
   };
 
-  // Check if file is previewable (image or PDF)
+  // Check if file is previewable (image, PDF, or video)
   const isPreviewable = (file) => {
     const mime = file.mimetype?.toLowerCase() || '';
     const ext = (file.originalname || file.filename || '').toLowerCase();
-    return mime.includes('image') || mime.includes('pdf') || 
-           ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png') || 
-           ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.pdf');
+    return mime.includes('image') || mime.includes('pdf') || mime.includes('video') ||
+           ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png') ||
+           ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.pdf') ||
+           ext.endsWith('.mp4') || ext.endsWith('.webm') || ext.endsWith('.ogg') || ext.endsWith('.mov');
   };
 
   // Get previewable files from current view
@@ -1486,21 +1493,23 @@ function FileBrowser() {
             </button>
           )}
 
-          {/* Zoom controls */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-800/80 rounded-xl px-4 py-2 z-[210]">
-            <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(0.5, z - 0.25)); }} className="p-2 hover:bg-slate-700 rounded-lg text-white">
-              <FiZoomOut className="text-lg" />
-            </button>
-            <span className="text-white text-sm font-medium min-w-[60px] text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.min(3, z + 0.25)); }} className="p-2 hover:bg-slate-700 rounded-lg text-white">
-              <FiZoomIn className="text-lg" />
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); setZoom(1); }} className="p-2 hover:bg-slate-700 rounded-lg text-white text-xs">
-              Reset
-            </button>
-          </div>
+          {/* Zoom controls - only for images */}
+          {!previewFiles[previewIndex]?.mimetype?.includes('video') && !previewFiles[previewIndex]?.mimetype?.includes('pdf') && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-800/80 rounded-xl px-4 py-2 z-[210]">
+              <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(0.5, z - 0.25)); }} className="p-2 hover:bg-slate-700 rounded-lg text-white">
+                <FiZoomOut className="text-lg" />
+              </button>
+              <span className="text-white text-sm font-medium min-w-[60px] text-center">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.min(3, z + 0.25)); }} className="p-2 hover:bg-slate-700 rounded-lg text-white">
+                <FiZoomIn className="text-lg" />
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); setZoom(1); }} className="p-2 hover:bg-slate-700 rounded-lg text-white text-xs">
+                Reset
+              </button>
+            </div>
+          )}
 
           {/* Image counter */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800/80 rounded-xl px-4 py-2 z-[210]">
@@ -1510,7 +1519,7 @@ function FileBrowser() {
           </div>
 
           {/* Preview content */}
-          <div className="flex-1 flex items-center justify-center p-4 pb-24 overflow-visible" onClick={(e) => e.stopPropagation()}>
+          <div className={`flex-1 flex items-center justify-center p-4 overflow-visible ${!previewFiles[previewIndex]?.mimetype?.includes('video') && !previewFiles[previewIndex]?.mimetype?.includes('pdf') ? 'pb-24' : ''}`} onClick={(e) => e.stopPropagation()}>
             {previewFiles[previewIndex].mimetype?.includes('pdf') ? (
               /* PDF Preview */
               <div className="w-full h-full max-w-4xl">
@@ -1520,6 +1529,13 @@ function FileBrowser() {
                   title="PDF Preview"
                 />
               </div>
+            ) : previewFiles[previewIndex].mimetype?.includes('video') ? (
+              /* Video Preview with custom player */
+              <VideoPlayer
+                src={previewUrl || ''}
+                filename={previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
+                onDownload={() => handleDownload(previewFiles[previewIndex])}
+              />
             ) : previewLoading ? (
               /* Loading state */
               <div className="flex flex-col items-center gap-4">
@@ -1543,15 +1559,17 @@ function FileBrowser() {
             )}
           </div>
 
-          {/* File info */}
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-center z-[210]">
-            <p className="text-white font-medium text-sm mb-1">
-              {previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
-            </p>
-            <p className="text-slate-400 text-xs">
-              {formatSize(previewFiles[previewIndex].size)}
-            </p>
-          </div>
+          {/* File info - hide for video since it has its own overlay */}
+          {!previewFiles[previewIndex]?.mimetype?.includes('video') && (
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-center z-[210]">
+              <p className="text-white font-medium text-sm mb-1">
+                {previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
+              </p>
+              <p className="text-slate-400 text-xs">
+                {formatSize(previewFiles[previewIndex].size)}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
