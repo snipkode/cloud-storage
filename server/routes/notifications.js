@@ -4,6 +4,8 @@ const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-aut
 const { requireRole } = require('@middleware/role');
 const notificationStore = require('@lib/notification-store');
 const logger = require('@lib/logger');
+const { validateBody } = require('@lib/validation');
+const { z } = require('zod');
 
 // Combined auth middleware - supports both Firebase JWT and API Key
 const combinedAuth = (req, res, next) => {
@@ -137,6 +139,23 @@ router.delete('/:id',
 router.post('/broadcast',
   authMiddleware,
   requireRole('super_admin'),
+  validateBody(z.object({
+    title: z.string()
+      .min(1, 'Title is required')
+      .max(200, 'Title must be less than 200 characters')
+      .trim(),
+    message: z.string()
+      .min(1, 'Message is required')
+      .max(1000, 'Message must be less than 1000 characters')
+      .trim(),
+    type: z.enum(['info', 'warning', 'error', 'success'])
+      .optional()
+      .default('info'),
+    priority: z.enum(['low', 'normal', 'high', 'urgent'])
+      .optional()
+      .default('normal'),
+    metadata: z.record(z.any()).optional()
+  })),
   async (req, res) => {
     try {
       const { title, message, type, priority, metadata } = req.body;
@@ -172,6 +191,26 @@ router.post('/broadcast',
 router.post('/send',
   authMiddleware,
   requireRole('super_admin'),
+  validateBody(z.object({
+    userId: z.string()
+      .min(1, 'User ID is required')
+      .max(128, 'User ID too long'),
+    title: z.string()
+      .min(1, 'Title is required')
+      .max(200, 'Title must be less than 200 characters')
+      .trim(),
+    message: z.string()
+      .min(1, 'Message is required')
+      .max(1000, 'Message must be less than 1000 characters')
+      .trim(),
+    type: z.enum(['info', 'warning', 'error', 'success'])
+      .optional()
+      .default('info'),
+    priority: z.enum(['low', 'normal', 'high', 'urgent'])
+      .optional()
+      .default('normal'),
+    metadata: z.record(z.any()).optional()
+  })),
   async (req, res) => {
     try {
       const { userId, title, message, type, priority, metadata } = req.body;

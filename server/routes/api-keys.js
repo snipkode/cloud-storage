@@ -8,6 +8,8 @@ const apiKeyStore = require('@lib/api-key-store');
 const authMiddleware = require('@middleware/auth');
 const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-auth');
 const logger = require('@lib/logger');
+const { validateBody } = require('@lib/validation');
+const { z } = require('zod');
 
 const router = express.Router();
 
@@ -23,7 +25,22 @@ const PERMISSION_LEVELS = {
  * Generate new API key
  * POST /api/api-keys
  */
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', 
+  authMiddleware, 
+  validateBody(z.object({
+    name: z.string()
+      .min(1, 'API key name is required')
+      .max(100, 'API key name must be less than 100 characters')
+      .trim(),
+    permissions: z.array(z.enum(['read', 'upload', 'delete', 'admin']))
+      .optional()
+      .default(['read']),
+    expiresAt: z.string().datetime().optional().nullable(),
+    environment: z.enum(['test', 'live'])
+      .optional()
+      .default('live')
+  })),
+  async (req, res) => {
   try {
     const { name, permissions, expiresAt, environment } = req.body;
 

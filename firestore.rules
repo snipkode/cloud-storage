@@ -1,0 +1,190 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is owner of the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Check if user has admin role
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+    }
+    
+    // Check if user has super_admin role
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+    }
+    
+    // Validate timestamp format
+    function isValidTimestamp() {
+      return request.resource.data is timestamp || 
+             (request.resource.data is string && request.resource.data.matches('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$'));
+    }
+    
+    // ==========================================
+    // USERS COLLECTION
+    // ==========================================
+    
+    match /users/{userId} {
+      // Users can read their own data
+      allow read: if isOwner(userId);
+      
+      // Only admins can update user roles
+      allow update: if isAdmin() && 
+                    request.resource.data.role in ['user', 'admin', 'super_admin'];
+      
+      // Only admins can create user documents
+      allow create: if isAdmin();
+      
+      // Only admins can delete user documents
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================
+    // FILES COLLECTION
+    // ==========================================
+    
+    match /files/{fileId} {
+      // Users can read their own files
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid ||
+                      isAdmin());
+      
+      // Users can create their own files
+      allow create: if isAuthenticated() && 
+                     request.resource.data.userId == request.auth.uid &&
+                     request.resource.data.filename is string &&
+                     request.resource.data.size is number &&
+                     request.resource.data.size <= 52428800 && // 50MB limit
+                     request.resource.data.mimetype is string;
+      
+      // Users can update their own files
+      allow update: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid;
+      
+      // Users can delete their own files, admins can delete any
+      allow delete: if isAuthenticated() && 
+                    (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ==========================================
+    // FOLDERS COLLECTION
+    // ==========================================
+    
+    match /folders/{folderId} {
+      // Users can read their own folders
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid ||
+                      isAdmin());
+      
+      // Users can create their own folders
+      allow create: if isAuthenticated() && 
+                     request.resource.data.userId == request.auth.uid &&
+                     request.resource.data.name is string &&
+                     request.resource.data.name.size() > 0 &&
+                     request.resource.data.name.size() <= 100;
+      
+      // Users can update their own folders
+      allow update: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid;
+      
+      // Users can delete their own folders, admins can delete any
+      allow delete: if isAuthenticated() && 
+                    (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ==========================================
+    // API KEYS COLLECTION
+    // ==========================================
+    
+    match /apiKeys/{keyId} {
+      // Users can read their own API keys (but not the encrypted key)
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid ||
+                      isAdmin());
+      
+      // Users can create API keys for themselves
+      allow create: if isAuthenticated() && 
+                     request.resource.data.userId == request.auth.uid &&
+                     request.resource.data.name is string &&
+                     request.resource.data.name.size() > 0 &&
+                     request.resource.data.name.size() <= 100 &&
+                     request.resource.data.permissions is list &&
+                     request.resource.data.permissions.all(p => p in ['read', 'upload', 'delete', 'admin']);
+      
+      // Users can update their own API keys (revoke, toggle, etc.)
+      allow update: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid &&
+                     // Prevent changing the encrypted key or user ID
+                     request.resource.data.keyHash == resource.data.keyHash &&
+                     request.resource.data.userId == resource.data.userId;
+      
+      // Users can delete their own API keys, admins can delete any
+      allow delete: if isAuthenticated() && 
+                    (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ==========================================
+    // NOTIFICATIONS COLLECTION
+    // ==========================================
+    
+    match /notifications/{notificationId} {
+      // Users can read broadcast notifications or notifications sent to them
+      allow read: if isAuthenticated() && 
+                     (resource.data.isBroadcast == true ||
+                      resource.data.targetUserId == request.auth.uid ||
+                      isSuperAdmin());
+      
+      // Only super admins can create notifications
+      allow create: if isSuperAdmin();
+      
+      // Only super admins can update notifications
+      allow update: if isSuperAdmin();
+      
+      // Only super admins can delete notifications
+      allow delete: if isSuperAdmin();
+    }
+    
+    // ==========================================
+    // USER NOTIFICATIONS COLLECTION
+    // ==========================================
+    
+    match /user_notifications/{userNotifId} {
+      // Users can read their own notification metadata
+      allow read: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid;
+      
+      // Users can update their own notification read status
+      allow update: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid &&
+                     // Only allow updating the 'read' field
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      
+      // Users can delete their own notifications
+      allow delete: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid;
+    }
+    
+    // ==========================================
+    // DEFAULT DENY
+    // ==========================================
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

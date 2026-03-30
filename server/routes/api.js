@@ -6,6 +6,8 @@ const authMiddleware = require('@middleware/auth');
 const { apiKeyMiddleware, requirePermission } = require('@middleware/api-key-auth');
 const fileMetadataStore = require('@lib/file-metadata-store');
 const logger = require('@lib/logger');
+const { validateBody } = require('@lib/validation');
+const { z } = require('zod');
 
 // Allowed file types for upload
 const ALLOWED_MIME_TYPES = [
@@ -662,10 +664,21 @@ router.get('/storage-stats',
 router.post('/folders',
   combinedAuth,
   requirePermission('upload'),
+  validateBody(z.object({
+    name: z.string()
+      .min(1, 'Folder name is required')
+      .max(100, 'Folder name must be less than 100 characters')
+      .trim()
+      .refine(
+        name => !/[<>:"/\\|?*]/.test(name),
+        'Folder name contains invalid characters. Invalid chars: < > : " / \\ | ? *'
+      ),
+    parentId: z.string().optional().nullable()
+  })),
   async (req, res) => {
   try {
     const { name, parentId } = req.body;
-    
+
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Folder name is required' });
     }
