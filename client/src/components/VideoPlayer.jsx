@@ -21,8 +21,8 @@ const ControlButton = ({ onClick, icon: Icon, title, children, className = '' })
 );
 
 export const VideoPlayer = ({ 
-  src, 
-  filename, 
+  src,
+  filename,
   onDownload,
   enableStreaming = true,
   apiBase = '',
@@ -42,13 +42,14 @@ export const VideoPlayer = ({
   const [hasError, setHasError] = useState(false);
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState(null);
   const [errorCount, setErrorCount] = useState(0);
-  
+
   // Streaming & quality state
   const [availableQualities, setAvailableQualities] = useState([]);
   const [selectedQuality, setSelectedQuality] = useState('auto');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isTranscoding, setIsTranscoding] = useState(false);
   const [currentStreamUrl, setCurrentStreamUrl] = useState(null);
+  const [useFallbackSrc, setUseFallbackSrc] = useState(false); // Fallback to direct src if streaming fails
 
   const controlTimeoutRef = useRef(null);
 
@@ -66,31 +67,43 @@ export const VideoPlayer = ({
       return;
     }
 
-    // If no token, fallback to regular src (blob URL from download)
+    // If no token, can't stream - show error
     if (!token) {
-      console.log('[VideoPlayer] No token, using fallback src');
+      console.error('[VideoPlayer] No token provided for streaming');
+      setHasError(true);
+      setCurrentStreamUrl(null);
+      return;
+    }
+
+    // If fallback mode (metadata not found), use original src
+    if (useFallbackSrc) {
+      console.log('[VideoPlayer] Using fallback src (metadata not found)');
       setCurrentStreamUrl(src || null);
       return;
     }
 
     const cleanFilename = filename.split('/').pop();
-    
-    // Build query parameters correctly with ? for first param and & for subsequent
+
+    // Build query parameters
     const queryParams = [];
     if (selectedQuality !== 'auto') {
       queryParams.push(`quality=${selectedQuality}`);
     }
     queryParams.push(`token=${encodeURIComponent(token)}`);
-    
+
     const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
 
-    // Use token in query param for video element compatibility
-    // Only add timestamp on initial load or quality change to prevent flickering
+    // Build stream URL
     const streamUrl = `${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}${queryString}`;
 
-    console.log('[VideoPlayer] Stream URL updated:', streamUrl.substring(0, 100) + '...');
+    console.log('[VideoPlayer] Stream URL:', streamUrl.substring(0, 120) + '...');
     setCurrentStreamUrl(streamUrl);
-  }, [enableStreaming, filename, selectedQuality, apiBase, token, src]);
+    
+    // Reset state for new video
+    setIsLoading(true);
+    setHasError(false);
+    setErrorCount(0);
+  }, [enableStreaming, filename, selectedQuality, apiBase, token, src, useFallbackSrc]);
 
   // Fetch available streaming qualities
   const fetchQualities = async () => {
@@ -192,48 +205,135 @@ export const VideoPlayer = ({
   };
 
   const handleLoadedMetadata = () => {
-    setDuration(videoRef.current?.duration || 0);
+    const video = videoRef.current;
+    setDuration(video?.duration || 0);
     setIsLoading(false);
+    console.log('[VideoPlayer] Metadata loaded:', {
+      readyState: video?.readyState,
+      networkState: video?.networkState,
+      duration: video?.duration,
+      videoWidth: video?.videoWidth,
+      videoHeight: video?.videoHeight,
+      src: video?.src?.substring(0, 100),
+      canPlayType: video?.canPlayType?.('video/mp4')
+    });
+
+    // Don't call load() here - it causes infinite loop!
+    // Video will continue loading automatically
+  };
+
+  const handleCanPlay = () => {
+    // Video has enough data to start playing
+    console.log('[VideoPlayer] Can play, readyState:', videoRef.current?.readyState);
+    setIsLoading(false);
+  };
+
+  const handleCanPlayThrough = () => {
+    // Video has enough data to play through without buffering
+    console.log('[VideoPlayer] Can play through');
+    setIsLoading(false);
+    // Auto-play if user tried to play while buffering
+    if (videoRef.current?.paused && !hasError) {
+      videoRef.current.play().catch(err => {
+        console.warn('[VideoPlayer] Auto-play failed:', err.message);
+      });
+    }
   };
 
   const handleWaiting = () => {
     // Only show loading if video is not ready yet (initial load)
     // Don't show on every buffer/wait event to prevent flickering
-    if (duration === 0) {
+    if (duration === 0 || videoRef.current?.readyState < 3) {
       setIsLoading(true);
     }
   };
   const handlePlaying = () => {
     setIsPlaying(true);
     setIsLoading(false);
+    console.log('[VideoPlayer] Started playing, currentTime:', videoRef.current?.currentTime);
   };
-  const handlePause = () => setIsPlaying(false);
+  const handlePause = () => {
+    setIsPlaying(false);
+    console.log('[VideoPlayer] Paused at:', videoRef.current?.currentTime);
+  };
   const handleError = (e) => {
     const video = videoRef.current;
     const error = video?.error;
     
-    console.error('Video error event:', e);
-    console.error('Video error details:', {
-      errorCode: error?.code,
-      errorMessage: error?.message,
-      networkState: video?.networkState,
-      readyState: video?.readyState,
-      src: video?.src,
-      errorNames: {
-        1: 'MEDIA_ERR_ABORTED',
-        2: 'MEDIA_ERR_NETWORK',
-        3: 'MEDIA_ERR_DECODE',
-        4: 'MEDIA_ERR_SRC_NOT_SUPPORTED'
-      }[error?.code] || 'UNKNOWN'
-    });
-    
+    const errorNames = {
+      1: 'MEDIA_ERR_ABORTED',
+      2: 'MEDIA_ERR_NETWORK',
+      3: 'MEDIA_ERR_DECODE',
+      4: 'MEDIA_ERR_SRC_NOT_SUPPORTED'
+    };
+
+    console.error('=== Video Error Details ===');
+    console.error('Error event:', e);
+    console.error('Error code:', error?.code, '-', errorNames[error?.code] || 'UNKNOWN');
+    console.error('Error message:', error?.message);
+    console.error('Network state:', video?.networkState, {
+      0: 'NETWORK_EMPTY',
+      1: 'NETWORK_IDLE',
+      2: 'NETWORK_LOADING',
+      3: 'NETWORK_NO_SOURCE'
+    }[video?.networkState]);
+    console.error('Ready state:', video?.readyState, {
+      0: 'HAVE_NOTHING',
+      1: 'HAVE_METADATA',
+      2: 'HAVE_CURRENT_DATA',
+      3: 'HAVE_FUTURE_DATA',
+      4: 'HAVE_ENOUGH_DATA'
+    }[video?.readyState]);
+    console.error('Current src:', video?.src);
+    console.error('========================');
+
     setErrorCount(prev => prev + 1);
-    // Only show error after multiple failures (transient errors are common)
+    
+    // Auto-fallback to direct src on network error
+    if (error?.code === 2 && !useFallbackSrc) { // MEDIA_ERR_NETWORK
+      console.log('[VideoPlayer] Network error, attempting fallback...');
+      setUseFallbackSrc(true);
+      setHasError(false);
+      return;
+    }
+    
+    // Show error after multiple failures
     if (errorCount >= 2) {
       setHasError(true);
       setIsLoading(false);
     }
   };
+
+  // Check if there's a streaming error (404 from server)
+  useEffect(() => {
+    if (currentStreamUrl && enableStreaming && token && !useFallbackSrc) {
+      // Check if stream URL returns 404
+      const checkStreamUrl = async () => {
+        try {
+          console.log('[VideoPlayer] Checking stream URL status...');
+          const response = await fetch(currentStreamUrl, {
+            method: 'HEAD',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          console.log('[VideoPlayer] Stream URL status:', response.status);
+          
+          if (response.status === 404) {
+            console.error('[VideoPlayer] Stream URL returned 404 - file metadata not found in Firestore');
+            // Fallback to direct src instead of showing error
+            setUseFallbackSrc(true);
+            setIsLoading(false);
+          } else if (response.status === 200) {
+            console.log('[VideoPlayer] Stream URL is valid, content-length:', response.headers.get('content-length'));
+          }
+        } catch (err) {
+          console.warn('[VideoPlayer] Failed to check stream URL:', err.message);
+        }
+      };
+      checkStreamUrl();
+    }
+  }, [currentStreamUrl, enableStreaming, token, useFallbackSrc]);
 
   // Generate thumbnail from video and display as poster
   const generateThumbnail = () => {
@@ -271,12 +371,42 @@ export const VideoPlayer = ({
   // Play/Pause toggle
   const togglePlay = useCallback(() => {
     if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
+    
+    const video = videoRef.current;
+    console.log('[VideoPlayer] togglePlay called:', {
+      paused: video.paused,
+      readyState: video.readyState,
+      networkState: video.networkState,
+      currentTime: video.currentTime,
+      buffered: video.buffered?.length > 0 ? video.buffered.end(0) : 0,
+      src: video.src?.substring(0, 80)
+    });
+    
+    // Use video element's actual state, not React state (which can be stale)
+    if (video.paused) {
+      // Force load if needed
+      if (video.readyState < 2) {
+        console.log('[VideoPlayer] ReadyState too low, calling load() first');
+        video.load();
+      }
+      
+      video.play().then(() => {
+        console.log('[VideoPlayer] Play succeeded!');
+        setIsPlaying(true);
+      }).catch(err => {
+        console.error('[VideoPlayer] Play failed:', err.name, '-', err.message);
+        // Auto-fallback might have issues, try reloading
+        if (err.name === 'NotAllowedError') {
+          console.log('[VideoPlayer] Autoplay blocked - user interaction needed');
+        } else if (err.name === 'NotSupportedError') {
+          console.log('[VideoPlayer] Format not supported');
+        }
+      });
     } else {
-      videoRef.current.play();
+      video.pause();
+      console.log('[VideoPlayer] Paused manually');
     }
-  }, [isPlaying]);
+  }, []);
 
   // Seek handler
   const handleSeek = (e) => {
@@ -394,11 +524,49 @@ export const VideoPlayer = ({
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showQualityMenu]);
 
+  // Watch video element readyState and auto-play when buffer is ready
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Check if video can play but hasn't started yet
+    const checkReadyState = () => {
+      console.log('[VideoPlayer] ReadyState check:', {
+        readyState: video.readyState,
+        paused: video.paused,
+        networkState: video.networkState,
+        currentTime: video.currentTime,
+        duration: video.duration,
+        buffered: video.buffered?.length > 0 ? video.buffered.end(0) : 0
+      });
+
+      // ReadyState: 0=EMPTY, 1=METADATA, 2=CURRENT_DATA, 3=FUTURE_DATA, 4=ENOUGH_DATA
+      // If video has enough data (readyState >= 2) but is paused, try to play
+      if (video.readyState >= 2 && video.paused && video.duration > 0 && !hasError && !isLoading) {
+        console.log('[VideoPlayer] Video ready but paused (readyState=' + video.readyState + '), attempting play...');
+        video.play().then(() => {
+          console.log('[VideoPlayer] Play succeeded!');
+        }).catch(err => {
+          console.warn('[VideoPlayer] Play failed:', err.name, err.message);
+          // Don't set error - user can manually play
+        });
+      }
+    };
+
+    // Check after metadata is loaded
+    if (duration > 0) {
+      const timer = setTimeout(checkReadyState, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [duration, hasError, isLoading]);
+
   // Progress percentage
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   if (hasError) {
     const format = filename?.split('.').pop()?.toUpperCase() || 'Unknown';
+    const isVideoFormat = ['MP4', 'WEBM', 'OGG', 'MOV', 'AVI', 'MKV', 'FLV', 'WMV'].includes(format);
+    
     return (
       <div className="relative flex items-center justify-center h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-lg overflow-hidden">
         {/* Background pattern */}
@@ -406,23 +574,39 @@ export const VideoPlayer = ({
           backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
           backgroundSize: '32px 32px'
         }} />
-        
+
         {/* Subtle glow effect */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-red-500/5 rounded-full blur-3xl" />
-        
+
         <div className="relative z-10 text-center px-6 py-5 bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 shadow-xl">
           {/* Error icon */}
           <div className="w-12 h-12 mx-auto mb-3 bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-xl flex items-center justify-center border border-red-500/20 shadow-inner">
             <FiSettings className="text-xl text-red-400" />
           </div>
-          
+
           {/* Error message */}
           <h3 className="text-white font-semibold text-sm tracking-tight">Playback Error</h3>
           <p className="text-slate-500 text-xs mt-0.5 font-mono">{format}</p>
-          
+
+          {/* Additional info for videos */}
+          {isVideoFormat && (
+            <>
+              <div className="w-8 h-px bg-slate-700/50 mx-auto my-3" />
+              <p className="text-red-400 text-xs mt-1">
+                ⚠ File metadata not found in database
+              </p>
+              <p className="text-slate-500 text-[10px] mt-1">
+                File has <span className="text-red-400">red dot</span> in file list
+              </p>
+              <p className="text-slate-500 text-[10px] mt-1">
+                Server will auto-fallback to direct file access
+              </p>
+            </>
+          )}
+
           {/* Divider */}
           <div className="w-8 h-px bg-slate-700/50 mx-auto my-3" />
-          
+
           {/* Retry button */}
           <button
             onClick={() => { setHasError(false); setErrorCount(0); setIsLoading(true); }}
@@ -455,21 +639,40 @@ export const VideoPlayer = ({
         key={currentStreamUrl || src || 'no-src'}
         src={getStreamUrl()}
         poster={thumbnailDataUrl || undefined}
-        className="w-full h-full object-contain"
+        className="relative w-full h-full object-contain bg-black z-0"
+        preload="auto"
+        muted={isMuted}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
+        onCanPlay={handleCanPlay}
+        onCanPlayThrough={handleCanPlayThrough}
         onWaiting={handleWaiting}
         onPlaying={handlePlaying}
         onPause={handlePause}
         onError={handleError}
+        onStalled={(e) => {
+          console.log('[VideoPlayer] Stalled event:', e);
+          setIsLoading(true);
+        }}
+        onSuspend={(e) => {
+          console.log('[VideoPlayer] Suspend event - browser blocked autoplay');
+        }}
+        onProgress={(e) => {
+          const buffered = videoRef.current?.buffered;
+          if (buffered?.length > 0) {
+            console.log('[VideoPlayer] Progress, buffered:', buffered.end(buffered.length - 1));
+          }
+        }}
+        onLoadedData={() => {
+          console.log('[VideoPlayer] Loaded data event!');
+        }}
         onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-        autoPlay
         playsInline
       />
 
       {/* Default placeholder when no video loaded */}
       {!src && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 z-0">
           <div className="text-center">
             <div className="w-24 h-24 bg-white/5 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
               <FiFilm className="text-5xl text-white/40" />
@@ -481,7 +684,7 @@ export const VideoPlayer = ({
 
       {/* Loading state with spinner */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 pointer-events-none">
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 pointer-events-none z-30">
           <div className="text-center">
             <div className="w-14 h-14 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
             <p className="text-white/80 text-sm font-medium">Loading video...</p>
@@ -497,14 +700,14 @@ export const VideoPlayer = ({
 
       {/* Gradient overlay for controls */}
       <div
-        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 transition-opacity duration-300 ${
+        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 transition-opacity duration-300 z-10 ${
           showControls ? 'opacity-100' : 'opacity-0'
         }`}
       />
 
       {/* Controls */}
       <div
-        className={`absolute bottom-0 left-0 right-0 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-all duration-300 ${
+        className={`absolute bottom-0 left-0 right-0 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-all duration-300 z-20 ${
           showControls ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -642,7 +845,7 @@ export const VideoPlayer = ({
       {/* Center play button (when paused) - Compact & Precise */}
       {!isPlaying && !isLoading && (
         <div
-          className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/20 transition-colors cursor-pointer"
+          className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/20 transition-colors cursor-pointer z-20"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -657,7 +860,7 @@ export const VideoPlayer = ({
 
       {/* Filename overlay (top-right corner, compact) */}
       <div
-        className={`absolute top-3 right-3 transition-opacity duration-300 pointer-events-none ${
+        className={`absolute top-3 right-3 transition-opacity duration-300 pointer-events-none z-20 ${
           showControls && !isFullscreen ? 'opacity-100' : 'opacity-0'
         }`}
       >
