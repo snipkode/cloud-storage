@@ -271,7 +271,7 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
   return (
     <div
       ref={containerRef}
-      className="relative group bg-black rounded-lg overflow-hidden max-w-[90vw] max-h-[75vh]"
+      className="relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] aspect-video"
       onMouseMove={(e) => { e.stopPropagation(); resetControlTimeout(); }}
       onClick={(e) => { e.stopPropagation(); resetControlTimeout(); }}
     >
@@ -290,6 +290,18 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
         onClick={(e) => { e.stopPropagation(); togglePlay(); }}
         autoPlay
       />
+
+      {/* Default placeholder when no video loaded */}
+      {!src && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+          <div className="text-center">
+            <div className="w-24 h-24 bg-white/5 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+              <FiFilm className="text-5xl text-white/40" />
+            </div>
+            <p className="text-white/60 text-sm font-medium">No video loaded</p>
+          </div>
+        </div>
+      )}
 
       {/* Loading state with spinner */}
       {isLoading && (
