@@ -7,7 +7,7 @@
  *   node scripts/revoke-super-admin.js admin@example.com
  */
 
-require('dotenv').config({ path: '.env' });
+require('dotenv').config({ path: require('path').join(__dirname, '..', 'server', '.env') });
 
 const admin = require('firebase-admin');
 const path = require('path');

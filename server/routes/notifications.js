@@ -31,15 +31,22 @@ router.get('/',
   async (req, res) => {
     try {
       const limit = parseInt(req.query.limit) || 50;
+      logger.debug(`[Notifications] Getting notifications for user: ${req.user.uid}, limit: ${limit}`);
+      
       const notifications = await notificationStore.getUserNotifications(req.user.uid, limit);
+
+      logger.debug(`[Notifications] Found ${notifications.length} notifications`);
 
       res.json({
         notifications,
         total: notifications.length
       });
     } catch (error) {
-      logger.error('Get notifications error:', error.message);
-      res.status(500).json({ error: 'Failed to get notifications' });
+      logger.error('Get notifications error:', error.message, error.stack);
+      res.status(500).json({ 
+        error: 'Failed to get notifications',
+        details: error.message 
+      });
     }
   }
 );
@@ -235,6 +242,65 @@ router.post('/send',
     } catch (error) {
       logger.error('Send notification error:', error.message);
       res.status(500).json({ error: 'Failed to send notification' });
+    }
+  }
+);
+
+/**
+ * Send notification to multiple users (super_admin only)
+ * POST /api/notifications/send-batch
+ */
+router.post('/send-batch',
+  authMiddleware,
+  requireRole('super_admin'),
+  validateBody(z.object({
+    title: z.string()
+      .min(1, 'Title is required')
+      .max(200, 'Title must be less than 200 characters')
+      .trim(),
+    message: z.string()
+      .min(1, 'Message is required')
+      .max(1000, 'Message must be less than 1000 characters')
+      .trim(),
+    type: z.enum(['info', 'warning', 'error', 'success'])
+      .optional()
+      .default('info'),
+    priority: z.enum(['low', 'normal', 'high', 'urgent'])
+      .optional()
+      .default('normal'),
+    userIds: z.array(z.string()).min(1, 'At least one user ID required')
+  })),
+  async (req, res) => {
+    try {
+      const { title, message, type, priority, userIds } = req.body;
+
+      if (!title || !message || !userIds || userIds.length === 0) {
+        return res.status(400).json({ error: 'title, message, and userIds are required' });
+      }
+
+      // Create notification for each user
+      const notifications = [];
+      for (const userId of userIds) {
+        const notification = await notificationStore.createNotification({
+          title,
+          message,
+          type: type || 'info',
+          priority: priority || 'normal',
+          targetUserId: userId,
+          createdBy: req.user.uid
+        });
+        notifications.push(notification);
+      }
+
+      logger.info(`[Batch] Sent to ${notifications.length} users`);
+
+      res.status(201).json({
+        message: `Notification sent to ${notifications.length} user(s)`,
+        count: notifications.length
+      });
+    } catch (error) {
+      logger.error('Batch send error:', error.message);
+      res.status(500).json({ error: 'Failed to send batch notification' });
     }
   }
 );

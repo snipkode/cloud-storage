@@ -1,6 +1,17 @@
 // Load environment variables FIRST
 require('dotenv').config();
 
+// Add global error handlers FIRST
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -22,6 +33,7 @@ const apiRoutes = require('./routes/api');
 const apiKeyRoutes = require('./routes/api-keys');
 const notificationRoutes = require('./routes/notifications');
 const sambaRoutes = require('./routes/samba');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -100,6 +112,7 @@ app.use('/api', apiRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/samba', sambaRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

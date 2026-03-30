@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { FiKey, FiFolder, FiBell, FiMenu, FiX, FiLogOut, FiShield } from 'react-icons/fi';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { FiKey, FiFolder, FiBell, FiMenu, FiX, FiLogOut, FiShield, FiVolume2 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
 import ApiKeys from '@pages/ApiKeys';
@@ -25,17 +26,64 @@ function NotificationButton({ onClick }) {
   );
 }
 
-function Dashboard() {
-  const { user, token, logout } = useAuthStore();
-  const { setToken, fetchUnreadCount } = useNotificationStore();
-  const [currentPage, setCurrentPage] = useState('files');
+function Dashboard({ initialPage = 'files' }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, token, logout, loading } = useAuthStore();
+  const { setToken, fetchUnreadCount, fetchNotifications } = useNotificationStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+
+  // Show loading state while auth is being checked
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="text-center">
+          <div className="text-5xl animate-bounce mb-4">☁️</div>
+          <p className="text-slate-400 text-sm animate-pulse">Loading your cloud storage...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Determine current page from URL or initialPage prop
+  const getPageFromPath = () => {
+    const path = location.pathname.slice(1); // Remove leading /
+    if (['files', 'api-keys', 'admin', 'broadcast'].includes(path)) {
+      return path;
+    }
+    return initialPage;
+  };
+
+  const [currentPage, setCurrentPage] = useState(getPageFromPath());
+
+  // Update page when URL changes
+  useEffect(() => {
+    const page = getPageFromPath();
+    setCurrentPage(page);
+  }, [location.pathname]);
+
+  // Navigate to page and update URL
+  const navigateToPage = (page) => {
+    setCurrentPage(page);
+    navigate(`/${page}`);
+    setSidebarOpen(false);
+  };
+
+  // Filter nav items based on user role - using useMemo for proper re-rendering
+  const showAdminNav = useMemo(() => {
+    return user?.role === 'admin' || user?.role === 'super_admin';
+  }, [user?.role]);
+
+  const showBroadcastNav = useMemo(() => {
+    return user?.role === 'super_admin';
+  }, [user?.role]);
 
   // Initialize notification store with token
   useEffect(() => {
     if (token) {
       setToken(token);
+      fetchNotifications(50);
       fetchUnreadCount();
     }
   }, [token]);
@@ -44,10 +92,6 @@ function Dashboard() {
     { id: 'files', label: 'Files', icon: FiFolder },
     { id: 'api-keys', label: 'API Keys', icon: FiKey },
   ];
-
-  // Filter nav items based on user role
-  const showAdminNav = user?.role === 'admin' || user?.role === 'super_admin';
-  const showBroadcastNav = user?.role === 'super_admin';
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -66,12 +110,12 @@ function Dashboard() {
                 {sidebarOpen ? <FiX className="text-lg" /> : <FiMenu className="text-lg" />}
               </button>
 
-              {/* Logo */}
-              <div className="flex items-center gap-2.5">
+              {/* Logo - Desktop Only */}
+              <div className="hidden lg:flex items-center gap-2.5">
                 <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25">
                   <FiFolder className="text-white text-base" />
                 </div>
-                <div className="hidden sm:block">
+                <div>
                   <h1 className="text-white font-bold text-sm">Cloud Storage</h1>
                 </div>
               </div>
@@ -118,7 +162,7 @@ function Dashboard() {
               {navItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setCurrentPage(item.id)}
+                  onClick={() => navigateToPage(item.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     currentPage === item.id
                       ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
@@ -134,35 +178,38 @@ function Dashboard() {
             {/* Admin Navigation */}
             {(showAdminNav || showBroadcastNav) && (
               <>
-                <div className="my-3 border-t border-white/10"></div>
-                <div className="px-3 py-2">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Admin</p>
+                <div className="my-2 px-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Admin</span>
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
+                  </div>
                 </div>
-                <nav className="space-y-1 mt-1">
+                <nav className="space-y-0.5 px-1">
                   {showAdminNav && (
                     <button
-                      onClick={() => setCurrentPage('admin')}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      onClick={() => navigateToPage('admin')}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all ${
                         currentPage === 'admin'
-                          ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                          ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 shadow-lg shadow-indigo-500/10'
                           : 'text-slate-400 hover:text-white hover:bg-white/5'
                       }`}
                     >
-                      <FiShield className={`text-base ${currentPage === 'admin' ? 'text-indigo-400' : ''}`} />
-                      Admin Panel
+                      <FiShield className={`text-sm ${currentPage === 'admin' ? 'text-indigo-400' : ''}`} />
+                      <span>Admin Panel</span>
                     </button>
                   )}
                   {showBroadcastNav && (
                     <button
-                      onClick={() => setCurrentPage('broadcast')}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      onClick={() => navigateToPage('broadcast')}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all ${
                         currentPage === 'broadcast'
-                          ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/25 shadow-lg shadow-purple-500/10'
                           : 'text-slate-400 hover:text-white hover:bg-white/5'
                       }`}
                     >
-                      <FiBroadcast className={`text-base ${currentPage === 'broadcast' ? 'text-indigo-400' : ''}`} />
-                      Broadcast
+                      <FiVolume2 className={`text-sm ${currentPage === 'broadcast' ? 'text-purple-400' : ''}`} />
+                      <span>Broadcast</span>
                     </button>
                   )}
                 </nav>
@@ -251,8 +298,7 @@ function Dashboard() {
               <button
                 key={item.id}
                 onClick={() => {
-                  setCurrentPage(item.id);
-                  setSidebarOpen(false);
+                  navigateToPage(item.id);
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   currentPage === item.id
@@ -264,6 +310,51 @@ function Dashboard() {
                 {item.label}
               </button>
             ))}
+
+            {/* Admin Navigation - Mobile */}
+            {(showAdminNav || showBroadcastNav) && (
+              <>
+                <div className="my-2 px-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Admin</span>
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
+                  </div>
+                </div>
+                <nav className="space-y-0.5 px-1">
+                  {showAdminNav && (
+                    <button
+                      onClick={() => {
+                        navigateToPage('admin');
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                        currentPage === 'admin'
+                          ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 shadow-lg shadow-indigo-500/10'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <FiShield className={`text-sm ${currentPage === 'admin' ? 'text-indigo-400' : ''}`} />
+                      <span>Admin Panel</span>
+                    </button>
+                  )}
+                  {showBroadcastNav && (
+                    <button
+                      onClick={() => {
+                        navigateToPage('broadcast');
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                        currentPage === 'broadcast'
+                          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/25 shadow-lg shadow-purple-500/10'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <FiVolume2 className={`text-sm ${currentPage === 'broadcast' ? 'text-purple-400' : ''}`} />
+                      <span>Broadcast</span>
+                    </button>
+                  )}
+                </nav>
+              </>
+            )}
           </nav>
         </aside>
 

@@ -10,7 +10,16 @@
     "build:client": "cd client && npm run build",
     "start": "cd server && npm start"
   },
-  "keywords": ["cloud-storage", "firebase", "react", "multi-tenant"],
+  "keywords": [
+    "cloud-storage",
+    "firebase",
+    "react",
+    "multi-tenant"
+  ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "firebase-admin": "^13.7.0"
+  }
 }

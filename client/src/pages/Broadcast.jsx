@@ -1,29 +1,38 @@
-import { useState } from 'react';
-import { FiBroadcast, FiSend, FiUsers, FiAlertCircle } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
+import { FiVolume2, FiSend, FiUsers, FiUser, FiAlertCircle, FiX, FiChevronDown } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
+import { useAdminStore } from '@store/adminStore';
 
 function Broadcast() {
   const { user } = useAuthStore();
+  const { users, fetchUsers } = useAdminStore();
+  
   const [formData, setFormData] = useState({
     title: '',
     message: '',
     priority: 'normal',
-    link: ''
+    link: '',
+    recipientType: 'all',
+    selectedUserIds: []
   });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
+  const [showUsers, setShowUsers] = useState(false);
 
-  // Check if user is super_admin
   const isSuperAdmin = user?.role === 'super_admin';
+
+  useEffect(() => {
+    if (isSuperAdmin) fetchUsers(100, 0);
+  }, [isSuperAdmin]);
 
   if (!isSuperAdmin) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
-          <FiAlertCircle className="text-6xl text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-          <p className="text-slate-400">Only super admins can send broadcasts.</p>
+          <FiAlertCircle className="text-4xl text-red-500 mx-auto mb-2" />
+          <h2 className="text-lg font-bold text-white">Access Denied</h2>
+          <p className="text-slate-400 text-xs">Super admin only</p>
         </div>
       </div>
     );
@@ -35,194 +44,250 @@ function Broadcast() {
     setError(null);
 
     try {
-      // TODO: Implement API call to send broadcast
-      // await fetch('/api/notifications/broadcast', { ... })
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      setSent(true);
-      setFormData({ title: '', message: '', priority: 'normal', link: '' });
-      
-      // Reset success message after 3 seconds
-      setTimeout(() => setSent(false), 3000);
-    } catch (_err) {
-      setError('Failed to send broadcast. Please try again.');
+      const { token } = useAuthStore.getState();
+      const endpoint = formData.recipientType === 'all' 
+        ? '/api/notifications/broadcast'
+        : '/api/notifications/send-batch';
+
+      const payload = formData.recipientType === 'all'
+        ? {
+            title: formData.title,
+            message: formData.message,
+            type: 'info',
+            priority: formData.priority
+          }
+        : {
+            title: formData.title,
+            message: formData.message,
+            type: 'info',
+            priority: formData.priority,
+            userIds: formData.selectedUserIds
+          };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setSent(true);
+        setFormData({ title: '', message: '', priority: 'normal', link: '', recipientType: 'all', selectedUserIds: [] });
+        
+        // Refresh notifications
+        const { useNotificationStore } = await import('@store/notificationStore');
+        useNotificationStore.getState().fetchNotifications();
+        useNotificationStore.getState().fetchUnreadCount();
+        
+        setTimeout(() => setSent(false), 2500);
+      } else {
+        setError(data.error || 'Failed to send');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to send');
     } finally {
       setSending(false);
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const toggleUser = (id) => {
+    setFormData(p => ({
+      ...p,
+      selectedUserIds: p.selectedUserIds.includes(id)
+        ? p.selectedUserIds.filter(i => i !== id)
+        : [...p.selectedUserIds, id]
+    }));
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-3">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center">
-          <FiBroadcast className="text-white text-xl" />
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-md flex items-center justify-center">
+          <FiVolume2 className="text-white text-xs" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">Broadcast Notification</h1>
-          <p className="text-slate-400 text-sm">Send notifications to all users</p>
+          <h1 className="text-base font-semibold text-white">Broadcast</h1>
+          <p className="text-slate-400 text-[10px]">Send notifications</p>
         </div>
       </div>
 
-      {/* Info Card */}
-      <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-3">
-        <FiUsers className="text-blue-400 text-xl mt-0.5" />
-        <div>
-          <h3 className="text-sm font-semibold text-blue-400 mb-1">Broadcast Recipients</h3>
-          <p className="text-sm text-slate-400">
-            This notification will be sent to all registered users. They will receive it in their notification panel.
-          </p>
+      {/* Recipients */}
+      <div className="bg-slate-800/50 rounded-lg border border-white/5 p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <FiUsers className="text-indigo-400 text-xs" />
+            <span className="text-xs font-medium text-white">Recipients</span>
+          </div>
+          <span className="text-[10px] text-slate-500">
+            {formData.recipientType === 'all' ? 'All users' : `${formData.selectedUserIds.length} selected`}
+          </span>
         </div>
+        
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setFormData(p => ({ ...p, recipientType: 'all' }))}
+            className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] font-medium ${
+              formData.recipientType === 'all'
+                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                : 'bg-slate-700/50 text-slate-400'
+            }`}
+          >
+            <FiUsers className="text-[9px]" />
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setFormData(p => ({ ...p, recipientType: 'specific' }))}
+            className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] font-medium ${
+              formData.recipientType === 'specific'
+                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                : 'bg-slate-700/50 text-slate-400'
+            }`}
+          >
+            <FiUser className="text-[9px]" />
+            Specific
+          </button>
+        </div>
+
+        {formData.recipientType === 'specific' && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowUsers(!showUsers)}
+              className="w-full flex items-center justify-between px-2 py-1.5 bg-slate-700/50 rounded text-[10px] text-slate-300"
+            >
+              <span>{showUsers ? 'Hide users' : `${formData.selectedUserIds.length || 0} selected`}</span>
+              <FiChevronDown className={`text-[9px] transition-transform ${showUsers ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showUsers && (
+              <div className="max-h-40 overflow-auto bg-slate-900/50 rounded border border-white/5 p-1.5 space-y-0.5">
+                <div className="flex items-center justify-between px-1.5 py-1">
+                  <span className="text-[9px] text-slate-500">{users.length} users</span>
+                  <button
+                    onClick={() => setFormData(p => ({ 
+                      ...p, 
+                      selectedUserIds: p.selectedUserIds.length === users.length ? [] : users.map(u => u.uid)
+                    }))}
+                    className="text-[9px] text-indigo-400"
+                  >
+                    {formData.selectedUserIds.length === users.length ? 'Deselect all' : 'Select all'}
+                  </button>
+                </div>
+                {users.map(u => (
+                  <label key={u.uid} className="flex items-center gap-1.5 px-1.5 py-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.selectedUserIds.includes(u.uid)}
+                      onChange={() => toggleUser(u.uid)}
+                      className="w-3 h-3 rounded border-slate-600 text-indigo-500"
+                    />
+                    <span className="text-[10px] text-white truncate flex-1">
+                      {u.displayName || u.email?.split('@')[0] || 'User'}
+                    </span>
+                    {u.role !== 'user' && (
+                      <span className={`text-[8px] px-1 py-0.5 rounded ${
+                        u.role === 'super_admin' ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400'
+                      }`}>
+                        {u.role.replace('_', ' ')}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-slate-800/50 rounded-2xl border border-white/5 p-6 space-y-5">
-        {/* Title */}
+      <form onSubmit={handleSubmit} className="bg-slate-800/50 rounded-lg border border-white/5 p-3 space-y-2.5">
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-slate-300 mb-2">
-            Title <span className="text-red-400">*</span>
-          </label>
           <input
             type="text"
-            id="title"
             name="title"
             value={formData.title}
-            onChange={handleChange}
+            onChange={(e) => setFormData(p => ({ ...p, title: e.target.value }))}
+            placeholder="Title"
             required
-            placeholder="e.g., System Maintenance Scheduled"
-            className="w-full px-4 py-2.5 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+            className="w-full px-2.5 py-2 bg-slate-900/50 border border-white/10 rounded text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50"
           />
         </div>
 
-        {/* Message */}
         <div>
-          <label htmlFor="message" className="block text-sm font-medium text-slate-300 mb-2">
-            Message <span className="text-red-400">*</span>
-          </label>
           <textarea
-            id="message"
             name="message"
             value={formData.message}
-            onChange={handleChange}
+            onChange={(e) => setFormData(p => ({ ...p, message: e.target.value }))}
+            placeholder="Message"
             required
-            rows={5}
-            placeholder="Write your broadcast message here..."
-            className="w-full px-4 py-2.5 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all resize-none"
+            rows={3}
+            className="w-full px-2.5 py-2 bg-slate-900/50 border border-white/10 rounded text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 resize-none"
           />
-          <p className="text-xs text-slate-500 mt-1">{formData.message.length}/1000 characters</p>
+          <p className="text-[9px] text-slate-500 text-right mt-0.5">{formData.message.length}/1000</p>
         </div>
 
-        {/* Priority */}
-        <div>
-          <label htmlFor="priority" className="block text-sm font-medium text-slate-300 mb-2">
-            Priority
-          </label>
+        <div className="grid grid-cols-2 gap-2">
           <select
-            id="priority"
             name="priority"
             value={formData.priority}
-            onChange={handleChange}
-            className="w-full px-4 py-2.5 bg-slate-900/50 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+            onChange={(e) => setFormData(p => ({ ...p, priority: e.target.value }))}
+            className="px-2.5 py-2 bg-slate-900/50 border border-white/10 rounded text-white text-sm focus:outline-none focus:border-indigo-500/50"
           >
-            <option value="low">Low - Normal notification</option>
-            <option value="normal">Normal - Standard priority</option>
-            <option value="high">High - Important announcement</option>
-            <option value="urgent">Urgent - Critical information</option>
+            <option value="low">Low</option>
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
           </select>
-        </div>
-
-        {/* Optional Link */}
-        <div>
-          <label htmlFor="link" className="block text-sm font-medium text-slate-300 mb-2">
-            Optional Link
-          </label>
           <input
             type="url"
-            id="link"
             name="link"
             value={formData.link}
-            onChange={handleChange}
-            placeholder="https://example.com/more-info"
-            className="w-full px-4 py-2.5 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
+            onChange={(e) => setFormData(p => ({ ...p, link: e.target.value }))}
+            placeholder="Link (optional)"
+            className="px-2.5 py-2 bg-slate-900/50 border border-white/10 rounded text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50"
           />
-          <p className="text-xs text-slate-500 mt-1">Add a link for users to learn more (optional)</p>
         </div>
 
-        {/* Error Message */}
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2 text-red-400 text-sm">
-            <FiAlertCircle className="text-base" />
+          <div className="p-2 bg-red-500/10 border border-red-500/20 rounded flex items-center gap-1.5 text-red-400 text-xs">
+            <FiAlertCircle className="text-xs" />
             {error}
           </div>
         )}
 
-        {/* Success Message */}
         {sent && (
-          <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center gap-2 text-green-400 text-sm">
-            <FiSend className="text-base" />
-            Broadcast sent successfully to all users!
+          <div className="p-2 bg-green-500/10 border border-green-500/20 rounded flex items-center gap-1.5 text-green-400 text-xs">
+            <FiSend className="text-xs" />
+            Sent!
           </div>
         )}
 
-        {/* Submit Button */}
-        <div className="flex items-center gap-3 pt-4">
+        <div className="flex gap-2 pt-1">
           <button
             type="submit"
             disabled={sending}
-            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium hover:opacity-90 transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded text-sm font-medium disabled:opacity-50"
           >
-            <FiSend className="text-base" />
-            {sending ? 'Sending...' : 'Send Broadcast'}
+            <FiSend className="text-sm" />
+            {sending ? 'Sending...' : 'Send'}
           </button>
           <button
             type="button"
-            onClick={() => setFormData({ title: '', message: '', priority: 'normal', link: '' })}
-            className="px-6 py-2.5 bg-slate-700/50 text-white rounded-xl font-medium hover:bg-slate-700 transition-all"
+            onClick={() => setFormData({ title: '', message: '', priority: 'normal', link: '', recipientType: 'all', selectedUserIds: [] })}
+            className="px-3 py-2 bg-slate-700/50 text-white rounded text-sm font-medium hover:bg-slate-700"
           >
             Clear
           </button>
         </div>
       </form>
-
-      {/* Recent Broadcasts */}
-      <div className="bg-slate-800/50 rounded-2xl border border-white/5 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Recent Broadcasts</h3>
-        <div className="space-y-3">
-          {[
-            { id: 1, title: 'System Maintenance', message: 'Scheduled maintenance on...', priority: 'high', date: '2 days ago' },
-            { id: 2, title: 'New Feature: Folders', message: 'You can now organize...', priority: 'normal', date: '1 week ago' },
-            { id: 3, title: 'Security Update', message: 'We have updated...', priority: 'urgent', date: '2 weeks ago' },
-          ].map((broadcast) => (
-            <div
-              key={broadcast.id}
-              className="p-4 bg-slate-900/50 rounded-xl border border-white/5 hover:border-white/10 transition-all"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <h4 className="text-sm font-semibold text-white">{broadcast.title}</h4>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  broadcast.priority === 'urgent' ? 'bg-red-500/20 text-red-400' :
-                  broadcast.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                  broadcast.priority === 'normal' ? 'bg-blue-500/20 text-blue-400' :
-                  'bg-slate-500/20 text-slate-400'
-                }`}>
-                  {broadcast.priority}
-                </span>
-              </div>
-              <p className="text-sm text-slate-400 mb-2">{broadcast.message}</p>
-              <p className="text-xs text-slate-500">{broadcast.date}</p>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

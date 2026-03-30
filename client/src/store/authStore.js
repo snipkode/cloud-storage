@@ -26,21 +26,19 @@ const useAuthStore = create((set, get) => ({
 
   init: () => {
     if (isFirebaseMock) {
-      // Mock mode - skip Firebase auth
-      console.log('🔧 Running in mock mode - Firebase not configured');
+      console.log('🔧 [AuthStore] Running in mock mode');
       set({ loading: false });
       return;
     }
 
-    // Real Firebase mode
     import('firebase/auth').then(({ getAuth, onAuthStateChanged }) => {
       const auth = getAuth(app);
+      
       onAuthStateChanged(auth, async (user) => {
         if (user) {
           const token = await user.getIdToken();
-          // Get user role from token claims or default to 'user'
           const idTokenResult = await user.getIdTokenResult();
-          const role = idTokenResult.claims.role || 'user';
+          const role = idTokenResult.claims?.role || 'user';
 
           set({
             user: {
@@ -55,12 +53,10 @@ const useAuthStore = create((set, get) => ({
             loading: false
           });
 
-          // Auto-refresh token every 50 minutes (token expires in 60 minutes)
           const { refreshToken } = get();
           const interval = setInterval(refreshToken, 50 * 60 * 1000);
           set({ tokenRefreshInterval: interval });
         } else {
-          // Clear interval on logout
           const { tokenRefreshInterval } = get();
           if (tokenRefreshInterval) {
             clearInterval(tokenRefreshInterval);
@@ -75,22 +71,21 @@ const useAuthStore = create((set, get) => ({
         }
       });
     }).catch(err => {
-      console.error('Firebase auth error:', err);
+      console.error('❌ [AuthStore] Firebase auth error:', err);
       set({ loading: false });
     });
   },
 
   login: async () => {
     if (isFirebaseMock) {
-      // Mock login for development
-      console.log('🔧 Mock login - Firebase not configured');
+      console.log('🔧 [AuthStore] Mock login');
       set({
         user: {
           uid: 'mock-user',
           email: 'dev@example.com',
           displayName: 'Dev User',
           photoURL: 'https://ui-avatars.com/api/?name=Dev+User&background=6366f1&color=fff',
-          role: 'super_admin' // Mock role for development
+          role: 'super_admin'
         },
         token: 'mock-token',
         isAuthenticated: true

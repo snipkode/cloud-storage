@@ -1,4 +1,4 @@
-const { accessLogger } = require('./logger');
+const { accessLogger } = require('../lib/logger');
 
 /**
  * Middleware to log all HTTP requests with details

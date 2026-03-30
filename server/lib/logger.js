@@ -1,4 +1,5 @@
 const winston = require('winston');
+const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
 const fs = require('fs');
 
@@ -39,7 +40,7 @@ const logger = winston.createLogger({
   },
   transports: [
     // Daily rotating file for errors (persistent)
-    new winston.transports.DailyRotateFile({
+    new DailyRotateFile({
       filename: path.join(logsDir, 'error-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       level: 'error',
@@ -49,7 +50,7 @@ const logger = winston.createLogger({
     }),
     
     // Daily rotating file for warnings (persistent)
-    new winston.transports.DailyRotateFile({
+    new DailyRotateFile({
       filename: path.join(logsDir, 'warn-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       level: 'warn',
@@ -59,7 +60,7 @@ const logger = winston.createLogger({
     }),
     
     // Daily rotating file for info (persistent)
-    new winston.transports.DailyRotateFile({
+    new DailyRotateFile({
       filename: path.join(logsDir, 'info-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       level: 'info',
@@ -70,7 +71,7 @@ const logger = winston.createLogger({
     
     // Daily rotating file for debug (persistent, development only)
     ...(process.env.NODE_ENV === 'development' ? [
-      new winston.transports.DailyRotateFile({
+      new DailyRotateFile({
         filename: path.join(logsDir, 'debug-%DATE%.log'),
         datePattern: 'YYYY-MM-DD',
         level: 'debug',
@@ -89,7 +90,7 @@ const logger = winston.createLogger({
     })
   ],
   exceptionHandlers: [
-    new winston.transports.DailyRotateFile({
+    new DailyRotateFile({
       filename: path.join(logsDir, 'exceptions-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       maxSize: '20m',
@@ -97,7 +98,7 @@ const logger = winston.createLogger({
     })
   ],
   rejectionHandlers: [
-    new winston.transports.DailyRotateFile({
+    new DailyRotateFile({
       filename: path.join(logsDir, 'rejections-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       maxSize: '20m',

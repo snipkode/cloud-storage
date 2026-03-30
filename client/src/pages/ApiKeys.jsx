@@ -2,122 +2,83 @@ import { useState, useEffect } from 'react';
 import {
   FiKey, FiPlus, FiTrash2, FiLock, FiCopy, FiCheck, FiCode,
   FiX, FiActivity, FiSearch, FiXCircle, FiEye,
-  FiBook, FiShield, FiClock, FiServer, FiUnlock, FiBell
+  FiBook, FiShield, FiClock, FiServer, FiUnlock, FiUpload
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import ApiIntegrationPreview from '@components/ApiIntegrationPreview';
-import BroadcastNotification from '@components/BroadcastNotification';
 
 const PERMISSION_LEVELS = [
-  { id: 'read_only', name: 'Read Only', description: 'List & download files only', permissions: ['read'], color: 'blue', icon: '📖' },
-  { id: 'upload_only', name: 'Upload Only', description: 'Upload files only', permissions: ['upload'], color: 'green', icon: '📤' },
-  { id: 'read_write', name: 'Read & Write', description: 'Full file management access', permissions: ['read', 'upload', 'delete'], color: 'purple', icon: '✏️' },
-  { id: 'admin', name: 'Admin', description: 'Unrestricted access to all resources', permissions: ['admin'], color: 'red', icon: '👑' }
+  {
+    id: 'read',
+    name: 'Read Only',
+    description: 'List and download files',
+    icon: <FiBook className="text-blue-400" />,
+    permissions: ['read']
+  },
+  {
+    id: 'upload',
+    name: 'Uploader',
+    description: 'Upload and manage own files',
+    icon: <FiUpload className="text-green-400" />,
+    permissions: ['read', 'upload']
+  },
+  {
+    id: 'delete',
+    name: 'File Manager',
+    description: 'Full file management access',
+    icon: <FiTrash2 className="text-orange-400" />,
+    permissions: ['read', 'upload', 'delete']
+  },
+  {
+    id: 'admin',
+    name: 'Admin',
+    description: 'Manage API keys and settings',
+    icon: <FiShield className="text-red-400" />,
+    permissions: ['read', 'upload', 'delete', 'admin']
+  }
 ];
 
 const CODE_EXAMPLES = {
   curl: {
     title: 'cURL',
-    icon: '🖥️',
+    icon: <FiBook className="text-green-400" />,
     examples: [
-      { name: 'List Files', code: `curl -H "Authorization: Bearer {{API_KEY}}" \\
-  http://localhost:3000/api/files` },
-      { name: 'Upload File', code: `curl -X POST \\
-  -H "Authorization: Bearer {{API_KEY}}" \\
-  -F "file=@document.pdf" \\
-  http://localhost:3000/api/upload` },
-      { name: 'Delete File', code: `curl -X DELETE \\
-  -H "Authorization: Bearer {{API_KEY}}" \\
-  http://localhost:3000/api/files/file-id` }
+      { name: 'List Files', code: 'curl -H "Authorization: Bearer {{API_KEY}}" http://localhost:3000/api/files' },
+      { name: 'Upload File', code: 'curl -X POST -H "Authorization: Bearer {{API_KEY}}" -F "file=@document.pdf" http://localhost:3000/api/upload' },
+      { name: 'Download File', code: 'curl -H "Authorization: Bearer {{API_KEY}}" -O http://localhost:3000/api/download/file-id' },
+      { name: 'Delete File', code: 'curl -X DELETE -H "Authorization: Bearer {{API_KEY}}" http://localhost:3000/api/delete/file-id' }
     ]
   },
   javascript: {
     title: 'JavaScript',
-    icon: '📜',
+    icon: <FiCode className="text-yellow-400" />,
     examples: [
-      { name: 'List Files', code: `const API_KEY = "{{API_KEY}}";
-
-// List files
-const response = await fetch('/api/files', {
-  headers: { 'Authorization': \`Bearer \${API_KEY}\` }
-});
-const files = await response.json();
-console.log('Files:', files);` },
-      { name: 'Upload File', code: `const formData = new FormData();
-formData.append('file', fileInput.files[0]);
-
-const response = await fetch('/api/upload', {
-  method: 'POST',
-  headers: { 'Authorization': \`Bearer \${API_KEY}\` },
-  body: formData
-});
-const result = await response.json();` },
-      { name: 'Delete File', code: `await fetch('/api/files/file-id', {
-  method: 'DELETE',
-  headers: { 'Authorization': \`Bearer \${API_KEY}\` }
-});` }
+      { name: 'List Files', code: 'const response = await fetch("http://localhost:3000/api/files", {\n  headers: { "Authorization": "Bearer {{API_KEY}}" }\n});\nconst files = await response.json();' },
+      { name: 'Upload File', code: 'const formData = new FormData();\nformData.append("file", fileInput.files[0]);\n\nconst response = await fetch("http://localhost:3000/api/upload", {\n  method: "POST",\n  headers: { "Authorization": "Bearer {{API_KEY}}" },\n  body: formData\n});' },
+      { name: 'Download File', code: 'const response = await fetch(`http://localhost:3000/api/download/${fileId}`, {\n  headers: { "Authorization": "Bearer {{API_KEY}}" }\n});\nconst blob = await response.blob();' }
     ]
   },
   python: {
     title: 'Python',
-    icon: '🐍',
+    icon: <FiCode className="text-blue-400" />,
     examples: [
-      { name: 'List Files', code: `import requests
-
-API_KEY = "{{API_KEY}}"
-headers = {'Authorization': f'Bearer {API_KEY}'}
-
-# List files
-response = requests.get('http://localhost:3000/api/files', headers=headers)
-files = response.json()
-print('Files:', files)` },
-      { name: 'Upload File', code: `with open('document.pdf', 'rb') as f:
-    response = requests.post(
-        'http://localhost:3000/api/upload',
-        headers=headers,
-        files={'file': f}
-    )
-result = response.json()` },
-      { name: 'Delete File', code: `response = requests.delete(
-    'http://localhost:3000/api/files/file-id',
-    headers=headers
-)` }
+      { name: 'List Files', code: 'import requests\n\nheaders = {"Authorization": "Bearer {{API_KEY}}"}\nresponse = requests.get("http://localhost:3000/api/files", headers=headers)\nfiles = response.json()' },
+      { name: 'Upload File', code: 'import requests\n\nheaders = {"Authorization": "Bearer {{API_KEY}}"}\nwith open("document.pdf", "rb") as f:\n    response = requests.post("http://localhost:3000/api/upload", headers=headers, files={"file": f})' },
+      { name: 'Download File', code: 'import requests\n\nheaders = {"Authorization": "Bearer {{API_KEY}}"}\nresponse = requests.get(f"http://localhost:3000/api/download/{file_id}", headers=headers)\nwith open("downloaded.pdf", "wb") as f:\n    f.write(response.content)' }
     ]
   },
   php: {
     title: 'PHP',
-    icon: '🐘',
+    icon: <FiCode className="text-purple-400" />,
     examples: [
-      { name: 'List Files', code: `<?php
-$apiKey = "{{API_KEY}}";
-
-// List files
-$response = file_get_contents(
-    'http://localhost:3000/api/files',
-    false,
-    stream_context_create([
-        'http' => ['header' => "Authorization: Bearer $apiKey"]
-    ])
-);
-$files = json_decode($response, true);
-?>` },
-      { name: 'Upload File', code: `<?php
-$ch = curl_init('http://localhost:3000/api/upload');
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    "Authorization: Bearer $apiKey"
-]);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, [
-    'file' => new \\CURLFile('document.pdf')
-]);
-$response = curl_exec($ch);
-?>` }
+      { name: 'List Files', code: '<?php\n$ch = curl_init("http://localhost:3000/api/files");\ncurl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {{API_KEY}}"]);\n$response = curl_exec($ch);\n$files = json_decode($response, true);\n?>' },
+      { name: 'Upload File', code: '<?php\n$ch = curl_init("http://localhost:3000/api/upload");\ncurl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {{API_KEY}}"]);\ncurl_setopt($ch, CURLOPT_POST, true);\ncurl_setopt($ch, CURLOPT_POSTFIELDS, ["file" => new \\CURLFile("document.pdf")]);\n$response = curl_exec($ch);\n?>' }
     ]
   }
 };
 
 function ApiKeys() {
-  const { token, user } = useAuthStore();
+  const { token, user, loading: authLoading } = useAuthStore();
   const [apiKeys, setApiKeys] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -139,10 +100,19 @@ function ApiKeys() {
   const [environment, setEnvironment] = useState('live');
   const [showRevealModal, setShowRevealModal] = useState(false);
   const [revealedKey, setRevealedKey] = useState(null);
-  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
 
-  // Check if user is super_admin
-  const isSuperAdmin = user?.role === 'super_admin';
+  // Handle not authenticated
+  if (!token) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🔐</div>
+          <h2 className="text-xl font-bold text-white mb-2">Authentication Required</h2>
+          <p className="text-slate-400 text-sm">Please log in to access API Keys</p>
+        </div>
+      </div>
+    );
+  }
 
   const loadApiKeys = async () => {
     setLoading(true);
@@ -372,15 +342,6 @@ function ApiKeys() {
           <FiBook className="text-indigo-400" />
           <span>API Docs</span>
         </button>
-        {isSuperAdmin && (
-          <button
-            onClick={() => setShowBroadcastModal(true)}
-            className="flex items-center justify-center w-9 h-9 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-lg transition-all shadow-lg shadow-purple-500/25 flex-shrink-0"
-            title="Broadcast Notification"
-          >
-            <FiBell className="text-base" />
-          </button>
-        )}
         <button
           onClick={() => setShowCreateModal(true)}
           className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
@@ -1154,11 +1115,6 @@ function ApiKeys() {
       {/* API Integration Preview Modal */}
       {showIntegrationPreview && (
         <ApiIntegrationPreview onClose={() => setShowIntegrationPreview(false)} />
-      )}
-
-      {/* Broadcast Notification Modal */}
-      {showBroadcastModal && (
-        <BroadcastNotification onClose={() => setShowBroadcastModal(false)} />
       )}
     </div>
   );

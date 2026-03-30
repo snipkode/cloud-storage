@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// Use relative path for API - Vite proxy will handle it
+const API_BASE_URL = '/api';
 
 const useNotificationStore = create((set, get) => ({
   notifications: [],
@@ -21,12 +22,20 @@ const useNotificationStore = create((set, get) => ({
   // Fetch notifications
   fetchNotifications: async (limit = 50) => {
     const state = get();
-    if (!state.token) return;
+    if (!state.token) {
+      console.warn('[Notification] No token available');
+      return;
+    }
 
     set({ loading: true, error: null });
     try {
       const headers = get().getHeaders();
-      const response = await fetch(`${API_BASE_URL}/notifications?limit=${limit}`, { headers });
+      const url = `${API_BASE_URL}/notifications?limit=${limit}`;
+      console.log('[Notification] Fetching from:', url);
+      
+      const response = await fetch(url, { headers });
+
+      console.log('[Notification] Response status:', response.status);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -36,6 +45,8 @@ const useNotificationStore = create((set, get) => ({
       }
 
       const data = await response.json();
+      console.log('[Notification] Received:', data.notifications?.length || 0, 'notifications');
+
       set({
         notifications: data.notifications || [],
         loading: false
@@ -44,7 +55,8 @@ const useNotificationStore = create((set, get) => ({
       // Update unread count
       get().fetchUnreadCount();
     } catch (error) {
-      set({ error: error.message, loading: false });
+      console.error('[Notification] Fetch error:', error.message);
+      set({ loading: false, error: error.message });
     }
   },
 
@@ -62,7 +74,8 @@ const useNotificationStore = create((set, get) => ({
         set({ unreadCount: data.unreadCount || 0 });
       }
     } catch (error) {
-      console.error('Failed to fetch unread count:', error);
+      // Silently fail - notifications are optional
+      // console.warn('Failed to fetch unread count:', error.message);
     }
   },
 
@@ -88,7 +101,8 @@ const useNotificationStore = create((set, get) => ({
         }));
       }
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      // Silently fail - notification is optional
+      console.warn('Failed to mark notification as read:', error.message);
     }
   },
 
@@ -111,7 +125,8 @@ const useNotificationStore = create((set, get) => ({
         }));
       }
     } catch (error) {
-      console.error('Failed to mark all as read:', error);
+      // Silently fail
+      console.warn('Failed to mark all as read:', error.message);
     }
   },
 
@@ -136,7 +151,8 @@ const useNotificationStore = create((set, get) => ({
         }));
       }
     } catch (error) {
-      console.error('Failed to delete notification:', error);
+      // Silently fail
+      console.warn('Failed to delete notification:', error.message);
     }
   },
 
