@@ -3,6 +3,7 @@ import {
   FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize, FiMinimize,
   FiSkipBack, FiSkipForward, FiSettings, FiDownload, FiFilm, FiCast
 } from 'react-icons/fi';
+import { useAuthStore } from '@store/authStore';
 
 /**
  * Beautiful compact video player with advanced controls
@@ -15,6 +16,7 @@ export const VideoPlayer = ({
   enableStreaming = true,
   apiBase = '' 
 }) => {
+  const { token } = useAuthStore();
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -40,10 +42,10 @@ export const VideoPlayer = ({
 
   // Fetch available qualities when src changes
   useEffect(() => {
-    if (src && enableStreaming && filename && apiBase) {
+    if (src && enableStreaming && filename && apiBase && token) {
       fetchQualities();
     }
-  }, [src, filename, apiBase, enableStreaming]);
+  }, [src, filename, apiBase, enableStreaming, token]);
 
   // Fetch available streaming qualities
   const fetchQualities = async () => {
@@ -52,7 +54,7 @@ export const VideoPlayer = ({
       const cleanFilename = filename.split('/').pop();
       const response = await fetch(`${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}/qualities`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('firebaseToken')}`
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -322,17 +324,37 @@ export const VideoPlayer = ({
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   if (hasError) {
+    const format = filename?.split('.').pop()?.toUpperCase() || 'Unknown';
     return (
-      <div className="flex items-center justify-center h-full bg-gradient-to-br from-slate-900 to-slate-800 rounded-lg">
-        <div className="text-center text-slate-400">
-          <FiSettings className="text-5xl mb-3 mx-auto opacity-50" />
-          <p className="text-sm font-medium">Failed to load video</p>
-          <p className="text-xs mt-1 opacity-70">Format: {filename?.split('.').pop()?.toUpperCase() || 'Unknown'}</p>
+      <div className="relative flex items-center justify-center h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-lg overflow-hidden">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-[0.02]" style={{
+          backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+          backgroundSize: '32px 32px'
+        }} />
+        
+        {/* Subtle glow effect */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-red-500/5 rounded-full blur-3xl" />
+        
+        <div className="relative z-10 text-center px-6 py-5 bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 shadow-xl">
+          {/* Error icon */}
+          <div className="w-12 h-12 mx-auto mb-3 bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-xl flex items-center justify-center border border-red-500/20 shadow-inner">
+            <FiSettings className="text-xl text-red-400" />
+          </div>
+          
+          {/* Error message */}
+          <h3 className="text-white font-semibold text-sm tracking-tight">Playback Error</h3>
+          <p className="text-slate-500 text-xs mt-0.5 font-mono">{format}</p>
+          
+          {/* Divider */}
+          <div className="w-8 h-px bg-slate-700/50 mx-auto my-3" />
+          
+          {/* Retry button */}
           <button
             onClick={() => { setHasError(false); setErrorCount(0); setIsLoading(true); }}
-            className="mt-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-xs transition-colors"
+            className="w-full px-4 py-2 bg-white hover:bg-slate-100 text-slate-900 rounded-lg text-xs font-semibold transition-all duration-200 shadow-lg shadow-white/10 hover:shadow-white/20 active:scale-[0.98]"
           >
-            Retry
+            Try Again
           </button>
         </div>
       </div>
