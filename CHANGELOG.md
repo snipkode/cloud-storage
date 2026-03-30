@@ -1,5 +1,62 @@
 # Changelog
 
+## 2026-03-30 - Admin UI Dashboard & Broadcast
+
+### 🎨 New Feature: Admin UI
+
+Added comprehensive admin dashboard and broadcast management interface.
+
+#### Admin Dashboard Page
+
+**New navigation item** in sidebar (below API Keys):
+- **Admin Panel** - Visible to admin and super_admin roles
+- **Broadcast** - Visible to super_admin only
+
+#### Features
+
+**Admin Dashboard (`/admin`)**:
+- System statistics (users, API keys, storage, active sessions)
+- Quick action cards for User Management, Samba Integration, System Logs
+- Recent activity feed
+- Broadcast button (super_admin only)
+- Role-based access control
+
+**Broadcast Page (`/broadcast`)**:
+- Dedicated page for sending broadcast notifications
+- Priority levels: Low, Normal, High, Urgent
+- Optional link attachment
+- Character counter (max 1000 chars)
+- Recent broadcasts history
+- Success/error feedback
+- Access restricted to super_admin only
+
+#### Files Created
+
+- `client/src/pages/AdminDashboard.jsx` - Admin dashboard page
+- `client/src/pages/Broadcast.jsx` - Broadcast notification page
+
+#### Updated Files
+
+- `client/src/pages/Dashboard.jsx` - Added admin navigation in sidebar
+
+#### UI Components
+
+**Sidebar Navigation:**
+```
+Files
+API Keys
+─── Admin ───
+Admin Panel    (admin, super_admin)
+Broadcast      (super_admin only)
+```
+
+**Access Control:**
+- Admin Panel: Requires `admin` or `super_admin` role
+- Broadcast: Requires `super_admin` role only
+- Access denied page shown for unauthorized users
+
+---
+
 ## 2026-03-30 - Samba (SMB/CIFS) Integration
 
 ### 🗄️ New Feature: Samba Integration
