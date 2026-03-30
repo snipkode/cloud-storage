@@ -1488,16 +1488,16 @@ function FileBrowser() {
 
           {/* Zoom controls */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-800/80 rounded-xl px-4 py-2 z-[210]">
-            <button onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} className="p-2 hover:bg-slate-700 rounded-lg text-white">
+            <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(0.5, z - 0.25)); }} className="p-2 hover:bg-slate-700 rounded-lg text-white">
               <FiZoomOut className="text-lg" />
             </button>
             <span className="text-white text-sm font-medium min-w-[60px] text-center">
               {Math.round(zoom * 100)}%
             </span>
-            <button onClick={() => setZoom(z => Math.min(3, z + 0.25))} className="p-2 hover:bg-slate-700 rounded-lg text-white">
+            <button onClick={(e) => { e.stopPropagation(); setZoom(z => Math.min(3, z + 0.25)); }} className="p-2 hover:bg-slate-700 rounded-lg text-white">
               <FiZoomIn className="text-lg" />
             </button>
-            <button onClick={() => setZoom(1)} className="p-2 hover:bg-slate-700 rounded-lg text-white text-xs">
+            <button onClick={(e) => { e.stopPropagation(); setZoom(1); }} className="p-2 hover:bg-slate-700 rounded-lg text-white text-xs">
               Reset
             </button>
           </div>
@@ -1510,13 +1510,13 @@ function FileBrowser() {
           </div>
 
           {/* Preview content */}
-          <div className="flex-1 flex items-center justify-center p-4 overflow-visible" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 flex items-center justify-center p-4 pb-24 overflow-visible" onClick={(e) => e.stopPropagation()}>
             {previewFiles[previewIndex].mimetype?.includes('pdf') ? (
               /* PDF Preview */
               <div className="w-full h-full max-w-4xl">
                 <iframe
                   src={previewUrl || ''}
-                  className="w-full h-[80vh] rounded-lg"
+                  className="w-full h-[75vh] rounded-lg"
                   title="PDF Preview"
                 />
               </div>
@@ -1531,7 +1531,7 @@ function FileBrowser() {
               <img
                 src={previewUrl}
                 alt={previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
-                className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                className="max-w-[90vw] max-h-[75vh] object-contain rounded-lg shadow-2xl"
                 style={{ transform: `scale(${zoom})`, transformOrigin: "center center", transition: "transform 0.2s ease-out" }}
               />
             ) : (
