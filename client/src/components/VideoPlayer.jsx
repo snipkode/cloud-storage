@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize, FiMinimize,
-  FiSkipBack, FiSkipForward, FiSettings, FiDownload
+  FiSkipBack, FiSkipForward, FiSettings, FiDownload, FiFilm
 } from 'react-icons/fi';
 
 /**
