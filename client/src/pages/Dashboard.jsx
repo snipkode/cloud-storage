@@ -155,111 +155,147 @@ function Dashboard({ initialPage = 'files' }) {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar Navigation - Desktop */}
-        <aside className="hidden lg:flex w-56 flex-col border-r border-white/5 glass bg-slate-900/50">
-          <div className="flex-1 py-4 px-2 overflow-y-auto">
-            {/* Navigation */}
-            <nav className="space-y-1">
+        <aside className="hidden lg:flex w-64 flex-col border-r border-white/5 bg-slate-900/80 backdrop-blur-xl">
+          <div className="flex-1 py-3 px-2 overflow-y-auto">
+            {/* Main Navigation */}
+            <nav className="space-y-0.5 mb-3">
               {navItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => navigateToPage(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                     currentPage === item.id
-                      ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                      ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/10'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <item.icon className={`text-base ${currentPage === item.id ? 'text-indigo-400' : ''}`} />
-                  {item.label}
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    currentPage === item.id 
+                      ? 'bg-indigo-500/20 border border-indigo-500/30' 
+                      : 'bg-slate-800/50'
+                  }`}>
+                    <item.icon className={`text-sm ${currentPage === item.id ? 'text-indigo-400' : 'text-slate-400'}`} />
+                  </div>
+                  <span>{item.label}</span>
                 </button>
               ))}
             </nav>
 
-            {/* Admin Navigation */}
+            {/* Admin Section */}
             {(showAdminNav || showBroadcastNav) && (
-              <>
-                <div className="my-2 px-2">
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Admin</span>
-                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent"></div>
-                  </div>
+              <div className="mb-3">
+                <div className="flex items-center gap-2 px-3 py-2 mb-1">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-600 to-transparent"></div>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">System</span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-600 to-transparent"></div>
                 </div>
-                <nav className="space-y-0.5 px-1">
+                <nav className="space-y-0.5">
                   {showAdminNav && (
                     <button
                       onClick={() => navigateToPage('admin')}
-                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                         currentPage === 'admin'
-                          ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 shadow-lg shadow-indigo-500/10'
+                          ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-500/30'
                           : 'text-slate-400 hover:text-white hover:bg-white/5'
                       }`}
                     >
-                      <FiShield className={`text-sm ${currentPage === 'admin' ? 'text-indigo-400' : ''}`} />
-                      <span>Admin Panel</span>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        currentPage === 'admin' 
+                          ? 'bg-blue-500/20 border border-blue-500/30' 
+                          : 'bg-slate-800/50'
+                      }`}>
+                        <FiShield className={`text-sm ${currentPage === 'admin' ? 'text-blue-400' : 'text-slate-400'}`} />
+                      </div>
+                      <span>Dashboard</span>
                     </button>
                   )}
                   {showBroadcastNav && (
                     <button
                       onClick={() => navigateToPage('broadcast')}
-                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all ${
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                         currentPage === 'broadcast'
-                          ? 'bg-purple-500/15 text-purple-400 border border-purple-500/25 shadow-lg shadow-purple-500/10'
+                          ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-500/30'
                           : 'text-slate-400 hover:text-white hover:bg-white/5'
                       }`}
                     >
-                      <FiVolume2 className={`text-sm ${currentPage === 'broadcast' ? 'text-purple-400' : ''}`} />
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        currentPage === 'broadcast' 
+                          ? 'bg-purple-500/20 border border-purple-500/30' 
+                          : 'bg-slate-800/50'
+                      }`}>
+                        <FiVolume2 className={`text-sm ${currentPage === 'broadcast' ? 'text-purple-400' : 'text-slate-400'}`} />
+                      </div>
                       <span>Broadcast</span>
                     </button>
                   )}
                 </nav>
-              </>
+              </div>
             )}
 
-            {/* Storage Info */}
-            <div className="mt-6 px-2">
-              <div className="p-3 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-xl border border-indigo-500/20">
-                <div className="flex items-center justify-between mb-2">
+            {/* Storage Widget */}
+            <div className="mx-2 p-3 bg-gradient-to-br from-slate-800/50 to-slate-800/30 rounded-xl border border-white/5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+                    <FiFolder className="text-indigo-400 text-xs" />
+                  </div>
                   <span className="text-xs font-medium text-white">Storage</span>
-                  <span className="text-[10px] text-slate-400">2.4 GB / 15 GB</span>
                 </div>
-                <div className="h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
-                  <div className="h-full w-[16%] bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
-                </div>
+                <span className="text-[10px] text-slate-400">16% used</span>
+              </div>
+              <div className="h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
+                <div className="h-full w-[16%] bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full"></div>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-slate-500">2.4 GB used</span>
+                <span className="text-[10px] text-slate-500">15 GB total</span>
               </div>
             </div>
 
             {/* Quick Stats */}
-            <div className="mt-4 px-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="p-2.5 bg-slate-800/30 rounded-lg border border-white/5">
-                  <div className="text-lg font-bold text-white">24</div>
-                  <div className="text-[10px] text-slate-500">Files</div>
+            <div className="mt-3 mx-2 grid grid-cols-2 gap-2">
+              <div className="p-2.5 bg-slate-800/30 rounded-lg border border-white/5 hover:border-white/10 transition-all">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="w-5 h-5 rounded bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                    <FiFile className="text-blue-400 text-xs" />
+                  </div>
+                  <span className="text-[10px] text-slate-400">Files</span>
                 </div>
-                <div className="p-2.5 bg-slate-800/30 rounded-lg border border-white/5">
-                  <div className="text-lg font-bold text-white">3</div>
-                  <div className="text-[10px] text-slate-500">Folders</div>
+                <p className="text-lg font-bold text-white">1,234</p>
+              </div>
+              <div className="p-2.5 bg-slate-800/30 rounded-lg border border-white/5 hover:border-white/10 transition-all">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="w-5 h-5 rounded bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+                    <FiKey className="text-purple-400 text-xs" />
+                  </div>
+                  <span className="text-[10px] text-slate-400">API Keys</span>
                 </div>
+                <p className="text-lg font-bold text-white">12</p>
               </div>
             </div>
           </div>
 
-          {/* Sidebar Footer */}
-          <div className="p-3 border-t border-white/5">
-            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-800/50 border border-white/5">
-              {user?.photoURL ? (
-                <img src={user.photoURL} alt={user.displayName} className="w-8 h-8 rounded-lg object-cover" />
-              ) : (
-                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">
-                    {user?.displayName?.charAt(0) || 'U'}
-                  </span>
-                </div>
+          {/* User Profile - Compact */}
+          <div className="p-2 border-t border-white/5">
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-800/30 border border-white/5 hover:border-white/10 transition-all">
+              {user?.photoURL && (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName}
+                  className="w-8 h-8 rounded-lg border border-indigo-500/30 object-cover"
+                />
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{user?.displayName || 'User'}</p>
-                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                <p className="text-xs font-medium text-white truncate">{user?.displayName || 'User'}</p>
+                <p className="text-[10px] text-slate-500 truncate">{user?.email || 'user@example.com'}</p>
               </div>
+              <button
+                onClick={logout}
+                className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                title="Sign Out"
+              >
+                <FiLogOut className="text-sm" />
+              </button>
             </div>
           </div>
         </aside>
