@@ -3,20 +3,31 @@ import {
   FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize, FiMinimize,
   FiSkipBack, FiSkipForward, FiSettings, FiDownload, FiFilm, FiCast
 } from 'react-icons/fi';
-import { useAuthStore } from '@store/authStore';
 
 /**
  * Beautiful compact video player with advanced controls
  * Supports streaming with transcoding and quality selection
  */
+
+// Reusable control button component
+const ControlButton = ({ onClick, icon: Icon, title, children, className = '' }) => (
+  <button
+    onClick={onClick}
+    className={`w-9 h-9 flex items-center justify-center hover:bg-white/15 rounded-md transition-all active:scale-95 text-white ${className}`}
+    title={title}
+  >
+    {children || <Icon className="text-sm" />}
+  </button>
+);
+
 export const VideoPlayer = ({ 
   src, 
   filename, 
   onDownload,
   enableStreaming = true,
-  apiBase = '' 
+  apiBase = '',
+  token // Firebase auth token (required for streaming)
 }) => {
-  const { token } = useAuthStore();
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -37,6 +48,7 @@ export const VideoPlayer = ({
   const [selectedQuality, setSelectedQuality] = useState('auto');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isTranscoding, setIsTranscoding] = useState(false);
+  const [currentStreamUrl, setCurrentStreamUrl] = useState(null);
 
   const controlTimeoutRef = useRef(null);
 
@@ -47,16 +59,57 @@ export const VideoPlayer = ({
     }
   }, [src, filename, apiBase, enableStreaming, token]);
 
+  // Generate stream URL when src, quality, or token changes (not on every render)
+  useEffect(() => {
+    if (!enableStreaming || !filename) {
+      setCurrentStreamUrl(src || null);
+      return;
+    }
+
+    // If no token, fallback to regular src (blob URL from download)
+    if (!token) {
+      console.log('[VideoPlayer] No token, using fallback src');
+      setCurrentStreamUrl(src || null);
+      return;
+    }
+
+    const cleanFilename = filename.split('/').pop();
+    
+    // Build query parameters correctly with ? for first param and & for subsequent
+    const queryParams = [];
+    if (selectedQuality !== 'auto') {
+      queryParams.push(`quality=${selectedQuality}`);
+    }
+    queryParams.push(`token=${encodeURIComponent(token)}`);
+    
+    const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+
+    // Use token in query param for video element compatibility
+    // Only add timestamp on initial load or quality change to prevent flickering
+    const streamUrl = `${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}${queryString}`;
+
+    console.log('[VideoPlayer] Stream URL updated:', streamUrl.substring(0, 100) + '...');
+    setCurrentStreamUrl(streamUrl);
+  }, [enableStreaming, filename, selectedQuality, apiBase, token, src]);
+
   // Fetch available streaming qualities
   const fetchQualities = async () => {
     try {
       // Extract just the filename from the full URL if needed
       const cleanFilename = filename.split('/').pop();
+      console.log('[VideoPlayer] Fetching qualities:', { 
+        url: `${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}/qualities`,
+        hasToken: !!token,
+        tokenLength: token?.length 
+      });
+      
       const response = await fetch(`${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}/qualities`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
+
+      console.log('[VideoPlayer] Qualities response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
@@ -73,22 +126,20 @@ export const VideoPlayer = ({
           }
         });
         
+        console.log('[VideoPlayer] Available qualities:', qualities);
         setAvailableQualities(qualities);
         setIsTranscoding(qualities.length === 1); // Only original = still transcoding
       }
     } catch (error) {
-      console.debug('[VideoPlayer] Failed to fetch qualities:', error.message);
+      console.warn('[VideoPlayer] Failed to fetch qualities:', error.message);
+      // Don't show error - fallback to regular streaming
     }
   };
 
-  // Get streaming URL based on selected quality
+  // Get streaming URL (memoized, no longer regenerated on every render)
   const getStreamUrl = useCallback(() => {
-    if (!enableStreaming || !filename) return src;
-    
-    const cleanFilename = filename.split('/').pop();
-    const qualityParam = selectedQuality !== 'auto' ? `&quality=${selectedQuality}` : '';
-    return `${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}?t=${Date.now()}${qualityParam}`;
-  }, [enableStreaming, filename, selectedQuality, apiBase, src]);
+    return currentStreamUrl || src || null;
+  }, [currentStreamUrl, src]);
 
   // Format time as mm:ss
   const formatTime = (seconds) => {
@@ -145,14 +196,37 @@ export const VideoPlayer = ({
     setIsLoading(false);
   };
 
-  const handleWaiting = () => setIsLoading(true);
+  const handleWaiting = () => {
+    // Only show loading if video is not ready yet (initial load)
+    // Don't show on every buffer/wait event to prevent flickering
+    if (duration === 0) {
+      setIsLoading(true);
+    }
+  };
   const handlePlaying = () => {
     setIsPlaying(true);
     setIsLoading(false);
   };
   const handlePause = () => setIsPlaying(false);
   const handleError = (e) => {
-    console.error('Video error:', e);
+    const video = videoRef.current;
+    const error = video?.error;
+    
+    console.error('Video error event:', e);
+    console.error('Video error details:', {
+      errorCode: error?.code,
+      errorMessage: error?.message,
+      networkState: video?.networkState,
+      readyState: video?.readyState,
+      src: video?.src,
+      errorNames: {
+        1: 'MEDIA_ERR_ABORTED',
+        2: 'MEDIA_ERR_NETWORK',
+        3: 'MEDIA_ERR_DECODE',
+        4: 'MEDIA_ERR_SRC_NOT_SUPPORTED'
+      }[error?.code] || 'UNKNOWN'
+    });
+    
     setErrorCount(prev => prev + 1);
     // Only show error after multiple failures (transient errors are common)
     if (errorCount >= 2) {
@@ -364,13 +438,21 @@ export const VideoPlayer = ({
   return (
     <div
       ref={containerRef}
-      className="relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] aspect-video"
+      className="relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] min-h-[350px]"
       onMouseMove={(e) => { e.stopPropagation(); resetControlTimeout(); }}
-      onClick={(e) => { e.stopPropagation(); resetControlTimeout(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        // Toggle play when clicking on video area (not controls)
+        if (!e.target.closest('button') && !e.target.closest('[role="button"]')) {
+          togglePlay();
+        }
+        resetControlTimeout();
+      }}
     >
       {/* Video element with thumbnail poster */}
       <video
         ref={videoRef}
+        key={currentStreamUrl || src || 'no-src'}
         src={getStreamUrl()}
         poster={thumbnailDataUrl || undefined}
         className="w-full h-full object-contain"
@@ -382,6 +464,7 @@ export const VideoPlayer = ({
         onError={handleError}
         onClick={(e) => { e.stopPropagation(); togglePlay(); }}
         autoPlay
+        playsInline
       />
 
       {/* Default placeholder when no video loaded */}
@@ -421,92 +504,74 @@ export const VideoPlayer = ({
 
       {/* Controls */}
       <div
-        className={`absolute bottom-0 left-0 right-0 p-4 transition-transform duration-300 ${
-          showControls ? 'translate-y-0' : 'translate-y-full'
+        className={`absolute bottom-0 left-0 right-0 px-3 pb-3 pt-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-all duration-300 ${
+          showControls ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Progress bar */}
+        {/* Progress bar - Compact & Precise */}
         <div
-          className="relative h-1.5 bg-white/20 rounded-full cursor-pointer group/progress mb-4 hover:h-2 transition-all"
+          className="relative h-1 bg-white/20 rounded-full cursor-pointer group/progress mb-3 hover:h-1.5 transition-all"
           onClick={(e) => { e.stopPropagation(); handleSeek(e); }}
         >
-          {/* Buffer progress */}
-          <div className="absolute inset-0 bg-white/10 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-white/20 rounded-full"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
           {/* Play progress */}
           <div
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all"
             style={{ width: `${progressPercent}%` }}
           >
-            {/* Playhead */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover/progress:scale-100 transition-transform" />
+            {/* Playhead - always visible on hover */}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full shadow-md scale-0 group-hover/progress:scale-100 transition-transform" />
           </div>
         </div>
 
         {/* Control buttons */}
-        <div className="flex items-center justify-between gap-3">
-          {/* Left controls */}
-          <div className="flex items-center gap-1">
-            {/* Play/Pause */}
-            <button
+        <div className="flex items-center justify-between gap-1 flex-nowrap">
+          {/* Left controls - Playback & Volume */}
+          <div className="flex items-center gap-0.5 flex-nowrap">
+            <ControlButton
               onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
+              icon={isPlaying ? FiPause : FiPlay}
               title={isPlaying ? 'Pause (K)' : 'Play (K)'}
+              className="text-base w-8 h-8"
             >
-              {isPlaying ? (
-                <FiPause className="text-lg" />
-              ) : (
-                <FiPlay className="text-lg" />
-              )}
-            </button>
+              {isPlaying ? <FiPause className="text-base" /> : <FiPlay className="text-base ml-0.5" />}
+            </ControlButton>
 
-            {/* Volume - mute toggle only */}
-            <button
+            <ControlButton
               onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
+              icon={isMuted || volume === 0 ? FiVolumeX : FiVolume2}
               title="Mute (M)"
-            >
-              {isMuted || volume === 0 ? (
-                <FiVolumeX className="text-base" />
-              ) : (
-                <FiVolume2 className="text-base" />
-              )}
-            </button>
+              className="w-8 h-8"
+            />
 
             {/* Time display */}
-            <span className="text-white text-xs font-medium tabular-nums ml-1">
+            <span className="text-white/90 text-xs font-medium tabular-nums ml-1 bg-black/20 px-1.5 py-0.5 rounded whitespace-nowrap">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           </div>
 
-          {/* Right controls */}
-          <div className="flex items-center gap-1 relative">
-            {/* Quality selector - only show if streaming enabled and qualities available */}
+          {/* Right controls - Quality, Download, Speed, Fullscreen */}
+          <div className="flex items-center gap-0.5 relative flex-nowrap">
+            {/* Quality selector */}
             {enableStreaming && availableQualities.length > 0 && (
               <div className="relative">
                 <button
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowQualityMenu(!showQualityMenu);
                   }}
-                  className="px-2 py-1 hover:bg-white/10 rounded-lg transition-colors text-white text-xs font-medium min-w-[40px] flex items-center gap-1"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white/15 rounded-md transition-all active:scale-95 text-white text-xs font-medium gap-1 flex-nowrap"
                   title="Quality"
                 >
                   <FiCast className="text-xs" />
-                  {selectedQuality === 'auto' ? 'AUTO' : selectedQuality.toUpperCase()}
+                  <span className="hidden sm:inline">{selectedQuality === 'auto' ? 'AUTO' : selectedQuality.toUpperCase()}</span>
                 </button>
-                
+
                 {/* Quality menu dropdown */}
                 {showQualityMenu && (
-                  <div 
+                  <div
                     className="absolute bottom-full right-0 mb-2 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-lg py-1 min-w-[100px] z-50"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Auto quality option */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -520,8 +585,7 @@ export const VideoPlayer = ({
                       Auto
                       {selectedQuality === 'auto' && <span className="text-indigo-400">✓</span>}
                     </button>
-                    
-                    {/* Available qualities */}
+
                     {availableQualities.map((q) => (
                       <button
                         key={q.quality}
@@ -538,7 +602,7 @@ export const VideoPlayer = ({
                         {selectedQuality === q.quality && <span className="text-indigo-400">✓</span>}
                       </button>
                     ))}
-                    
+
                     {isTranscoding && (
                       <div className="px-3 py-2 text-xs text-slate-400 border-t border-white/10 mt-1 pt-2">
                         <FiCast className="inline animate-spin mr-1" />
@@ -550,52 +614,45 @@ export const VideoPlayer = ({
               </div>
             )}
 
-            {/* Download */}
-            {onDownload && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onDownload(); }}
-                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
-                title="Download"
-              >
-                <FiDownload className="text-base" />
-              </button>
-            )}
+            <ControlButton
+              onClick={(e) => { e.stopPropagation(); onDownload(); }}
+              icon={FiDownload}
+              title="Download"
+              className={!onDownload ? 'hidden' : 'w-8 h-8'}
+            />
 
-            {/* Playback speed */}
-            <button
+            <ControlButton
               onClick={(e) => { e.stopPropagation(); togglePlaybackSpeed(); }}
-              className="px-2 py-1 hover:bg-white/10 rounded-lg transition-colors text-white text-xs font-medium min-w-[40px]"
               title="Playback speed"
+              className="text-xs font-semibold w-8 h-8"
             >
-              {playbackRate}x
-            </button>
+              <span>{playbackRate}x</span>
+            </ControlButton>
 
-            {/* Fullscreen */}
-            <button
+            <ControlButton
               onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
+              icon={isFullscreen ? FiMinimize : FiMaximize}
               title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
-            >
-              {isFullscreen ? (
-                <FiMinimize className="text-base" />
-              ) : (
-                <FiMaximize className="text-base" />
-              )}
-            </button>
+              className="w-8 h-8"
+            />
           </div>
         </div>
       </div>
 
-      {/* Center play button (when paused) */}
+      {/* Center play button (when paused) - Compact & Precise */}
       {!isPlaying && !isLoading && (
-        <button
-          onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-          className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors"
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/20 transition-colors cursor-pointer"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            togglePlay();
+          }}
         >
-          <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:scale-110 transition-transform">
-            <FiPlay className="text-4xl text-white ml-1" />
+          <div className="w-14 h-14 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-all duration-200">
+            <FiPlay className="text-2xl text-slate-900 ml-0.5" />
           </div>
-        </button>
+        </div>
       )}
 
       {/* Filename overlay (top-right corner, compact) */}

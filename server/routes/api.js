@@ -590,11 +590,27 @@ router.get('/stream/:filename',
     // Sanitize filename
     const filename = sanitizeFilename(req.params.filename);
 
-    // Get file metadata from Firestore
-    const fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
+    logger.debug(`[Stream] Looking for file: ${filename}, User: ${req.user.uid}, Env: ${env}`);
+
+    // Get file metadata from Firestore - try filename first
+    let fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
+
+    // If not found, try searching by originalname (for backward compatibility)
+    if (!fileMetadata) {
+      logger.debug(`[Stream] Not found by filename, trying originalname: ${filename}`);
+      fileMetadata = await fileMetadataStore.getFileByOriginalname(filename, req.user.uid, env);
+    }
+
+    logger.debug(`[Stream] Firestore metadata:`, fileMetadata ? { 
+      filename: fileMetadata.filename, 
+      originalname: fileMetadata.originalname,
+      path: fileMetadata.path 
+    } : 'NOT FOUND');
 
     // Find file in current environment
     let filePath = findFilePath(req.user.uid, env, fileMetadata);
+
+    logger.debug(`[Stream] File path from findFilePath:`, filePath);
 
     // If not found, try other environment
     if (!filePath) {
@@ -616,18 +632,23 @@ router.get('/stream/:filename',
     logger.debug(`[Stream] File path: ${filePath}`);
 
     // Check if file is a video that can be transcoded
-    const isVideo = fileMetadata?.mimetype?.includes('video') || 
+    const isVideo = fileMetadata?.mimetype?.includes('video') ||
                     transcodeLib.needsTranscoding(filename);
 
-    // Try to use transcoded version if available and enabled
+    // For MP4 files or original quality, always stream original
+    // For other formats with transcoding enabled, try transcoded version
     let streamPath = filePath;
-    if (isVideo && transcodeLib.TRANSCODE_CONFIG.enabled) {
+    const isMP4 = filename.toLowerCase().endsWith('.mp4');
+    const isOriginalQuality = quality === 'original';
+
+    if (isVideo && !isMP4 && !isOriginalQuality && transcodeLib.TRANSCODE_CONFIG.enabled) {
+      // Non-MP4 video: try to use transcoded version
       const cachedPath = transcodeLib.getCachedPath(filePath, quality);
       if (fs.existsSync(cachedPath)) {
         streamPath = cachedPath;
         logger.debug(`[Stream] Using transcoded cache: ${quality}`);
-      } else if (transcodeLib.needsTranscoding(filename)) {
-        // Start background transcode, but stream original for now
+      } else {
+        // Start background transcode for next time
         logger.info(`[Stream] Starting background transcode for: ${filename}`);
         transcodeLib.transcode(filePath, quality, (err) => {
           if (err) {
@@ -637,11 +658,15 @@ router.get('/stream/:filename',
           }
         });
       }
+    } else if (isMP4 || isOriginalQuality) {
+      logger.debug(`[Stream] Streaming original: ${filename} (MP4: ${isMP4}, Original: ${isOriginalQuality})`);
     }
 
     // Get file stats
     const stats = fs.statSync(streamPath);
     const fileSize = stats.size;
+
+    logger.debug(`[Stream] File: ${filename}, Size: ${fileSize} bytes, Path: ${streamPath}`);
 
     // Determine content type
     const ext = path.extname(filename).toLowerCase();
@@ -660,10 +685,14 @@ router.get('/stream/:filename',
     // Set headers for video streaming
     res.setHeader('Content-Type', contentType);
     res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
 
     // Handle HTTP Range requests (critical for video seeking)
     const range = req.headers.range;
+    
+    logger.debug(`[Stream] Range header: ${range || 'none'}`);
+    
     if (range) {
       const parts = range.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
@@ -676,14 +705,14 @@ router.get('/stream/:filename',
       res.setHeader('Content-Length', chunkSize);
       res.status(206); // Partial Content
 
-      const stream = fs.createReadStream(streamPath, { start, end });
+      const stream = fs.createReadStream(streamPath, { start, end, highWaterMark: 64 * 1024 });
       stream.pipe(res);
     } else {
       // No range header - send full file
       res.setHeader('Content-Length', fileSize);
       res.status(200);
 
-      const stream = fs.createReadStream(streamPath);
+      const stream = fs.createReadStream(streamPath, { highWaterMark: 64 * 1024 });
       stream.pipe(res);
     }
 
@@ -712,14 +741,25 @@ router.get('/stream/:filename/qualities',
     let env = baseEnv === 'test' ? 'test' : (queryEnv || 'live');
 
     const filename = sanitizeFilename(req.params.filename);
-    const fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
+    
+    logger.debug(`[Qualities] Looking for: ${filename}, User: ${req.user.uid}, Env: ${env}`);
+    
+    // Try filename first, then originalname
+    let fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
+    
+    if (!fileMetadata) {
+      logger.debug(`[Qualities] Not found by filename, trying originalname: ${filename}`);
+      fileMetadata = await fileMetadataStore.getFileByOriginalname(filename, req.user.uid, env);
+    }
 
     if (!fileMetadata) {
+      logger.warn(`[Qualities] File not found: ${filename}`);
       return res.status(404).json({ error: 'File not found' });
     }
 
     const filePath = findFilePath(req.user.uid, env, fileMetadata);
     if (!filePath) {
+      logger.warn(`[Qualities] File path not found: ${fileMetadata.filename}`);
       return res.status(404).json({ error: 'File not found' });
     }
 

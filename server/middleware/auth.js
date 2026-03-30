@@ -5,12 +5,31 @@ const logger = require('../lib/logger');
 const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    const queryToken = req.query.token; // Support token in query param for video streaming
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    logger.debug('[Auth] Request headers:', {
+      hasAuthHeader: !!authHeader,
+      authHeaderStart: authHeader?.substring(0, 10),
+      hasQueryToken: !!queryToken,
+      path: req.path
+    });
+
+    // Get token from header or query param
+    let token;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split('Bearer ')[1];
+    } else if (queryToken) {
+      token = queryToken;
+      logger.debug('[Auth] Using token from query param');
+    } else {
+      logger.warn('[Auth] No token provided in header or query');
       return res.status(401).json({ error: 'Unauthorized: No token provided' });
     }
 
-    const token = authHeader.split('Bearer ')[1];
+    logger.debug('[Auth] Token received:', {
+      tokenLength: token?.length,
+      tokenStart: token?.substring(0, 10)
+    });
 
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized: Invalid token format' });

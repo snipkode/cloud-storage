@@ -164,6 +164,23 @@ const getFileByFilename = async (filename, userId, environment = 'live') => {
 };
 
 /**
+ * Get file metadata by originalname and userId
+ */
+const getFileByOriginalname = async (originalname, userId, environment = 'live') => {
+  const snapshot = await db.collection(FILES_COLLECTION)
+    .where('originalname', '==', originalname)
+    .where('userId', '==', userId)
+    .where('environment', '==', environment)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return null;
+
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() };
+};
+
+/**
  * Get file metadata by ID
  */
 const getFileById = async (id, environment = 'live') => {
@@ -255,6 +272,7 @@ module.exports = {
   // File operations
   createFile,
   getFileByFilename,
+  getFileByOriginalname,
   getFileById,
   getUserFiles,
   incrementDownloadCount,

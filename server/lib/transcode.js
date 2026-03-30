@@ -101,7 +101,7 @@ function transcode(inputPath, quality = '720p', callback) {
 
   const preset = QUALITY_PRESETS[quality] || QUALITY_PRESETS['720p'];
   const outputPath = getCachedPath(inputPath, quality);
-  
+
   // Check if already cached
   if (fs.existsSync(outputPath)) {
     logger.debug(`[Transcode] Using cached: ${outputPath}`);
@@ -109,9 +109,9 @@ function transcode(inputPath, quality = '720p', callback) {
   }
 
   logger.info(`[Transcode] Starting: ${path.basename(inputPath)} -> ${quality}`);
-  
+
   const startTime = Date.now();
-  
+
   ffmpeg(inputPath, { timeout: 600 })
     .videoCodec('libx264')
     .audioCodec('aac')
@@ -119,11 +119,12 @@ function transcode(inputPath, quality = '720p', callback) {
     .audioBitrate(preset.audioBitrate)
     .size(preset.resolution)
     .outputOptions([
-      '-preset fast',
+      '-preset medium',
       '-crf 23',
       `-profile:v ${preset.profile}`,
-      '-movflags +faststart', // Enable fast start for web streaming
-      '-pix_fmt yuv420p' // Ensure compatibility
+      '-level 3.1',
+      '-movflags +faststart',
+      '-pix_fmt yuv420p'
     ])
     .on('start', (commandLine) => {
       logger.debug(`[Transcode] Command: ${commandLine}`);

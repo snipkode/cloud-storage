@@ -54,7 +54,7 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Environment', 'X-Folder-Path'],
-  exposedHeaders: ['Content-Disposition']
+  exposedHeaders: ['Content-Disposition', 'Content-Range', 'Accept-Ranges']
 };
 
 app.use(cors(corsOptions));

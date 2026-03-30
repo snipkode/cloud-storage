@@ -1537,6 +1537,7 @@ function FileBrowser() {
                 onDownload={() => handleDownload(previewFiles[previewIndex])}
                 enableStreaming={true}
                 apiBase={import.meta.env.VITE_API_URL || 'http://localhost:3000'}
+                token={token}
               />
             ) : previewLoading ? (
               /* Loading state */
