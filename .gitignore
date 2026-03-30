@@ -11,6 +11,7 @@ package-lock.json
 server/firebase-service-key.json
 server/data/api-keys.json
 client/src/lib/firebase-config.js
+scripts/super-admin-credentials.txt
 
 # Build output
 dist/

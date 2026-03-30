@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node -r module-alias/register server.js",
-    "dev": "nodemon -r module-alias/register server.js"
+    "dev": "nodemon -r module-alias/register server.js",
+    "seed:admin": "node ../scripts/seed-super-admin.js",
+    "verify:seed": "node ../scripts/verify-seed.js"
   },
   "_moduleAliases": {
     "@routes": "./routes",
