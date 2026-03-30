@@ -20,7 +20,8 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [showThumbnail, setShowThumbnail] = useState(true);
+  const [thumbnailDataUrl, setThumbnailDataUrl] = useState(null);
+  const [errorCount, setErrorCount] = useState(0);
 
   const controlTimeoutRef = useRef(null);
 
@@ -54,6 +55,22 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
     };
   }, [resetControlTimeout]);
 
+  // Generate thumbnail when src changes
+  useEffect(() => {
+    if (src) {
+      // Reset states for new video
+      setHasError(false);
+      setErrorCount(0);
+      setIsLoading(true);
+      setThumbnailDataUrl(null);
+      // Generate thumbnail after a short delay to ensure video is ready
+      const timer = setTimeout(() => {
+        generateThumbnail();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [src]);
+
   // Video event handlers
   const handleTimeUpdate = () => {
     setCurrentTime(videoRef.current?.currentTime || 0);
@@ -62,34 +79,55 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
   const handleLoadedMetadata = () => {
     setDuration(videoRef.current?.duration || 0);
     setIsLoading(false);
-    // Generate thumbnail after metadata loads
-    generateThumbnail();
   };
 
   const handleWaiting = () => setIsLoading(true);
   const handlePlaying = () => {
     setIsPlaying(true);
     setIsLoading(false);
-    setShowThumbnail(false);
   };
   const handlePause = () => setIsPlaying(false);
-  const handleError = () => setHasError(true);
+  const handleError = (e) => {
+    console.error('Video error:', e);
+    setErrorCount(prev => prev + 1);
+    // Only show error after multiple failures (transient errors are common)
+    if (errorCount >= 2) {
+      setHasError(true);
+      setIsLoading(false);
+    }
+  };
 
-  // Generate thumbnail from video
+  // Generate thumbnail from video and display as poster
   const generateThumbnail = () => {
     if (!videoRef.current) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = 320;
-    canvas.height = 180;
-    const ctx = canvas.getContext('2d');
-    // Seek to 10% of video for thumbnail
-    const thumbnailTime = Math.min(duration * 0.1, 10);
-    videoRef.current.currentTime = thumbnailTime;
-    setTimeout(() => {
-      if (videoRef.current) {
-        ctx?.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      }
-    }, 200);
+    
+    // Create a video element to extract frame
+    const tempVideo = document.createElement('video');
+    tempVideo.src = src;
+    tempVideo.crossOrigin = 'anonymous';
+    tempVideo.muted = true;
+    
+    tempVideo.addEventListener('loadeddata', () => {
+      // Seek to 10% of duration or 5 seconds, whichever is smaller
+      const thumbnailTime = Math.min(tempVideo.duration * 0.1, 5);
+      tempVideo.currentTime = thumbnailTime;
+    });
+    
+    tempVideo.addEventListener('seeked', () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 360;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      setThumbnailDataUrl(dataUrl);
+      setIsLoading(false);
+    });
+    
+    tempVideo.addEventListener('error', () => {
+      // Thumbnail generation failed, but video might still work
+      setIsLoading(false);
+    });
   };
 
   // Play/Pause toggle
@@ -218,7 +256,13 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
         <div className="text-center text-slate-400">
           <FiSettings className="text-5xl mb-3 mx-auto opacity-50" />
           <p className="text-sm font-medium">Failed to load video</p>
-          <p className="text-xs mt-1 opacity-70">This format may not be supported</p>
+          <p className="text-xs mt-1 opacity-70">Format: {filename?.split('.').pop()?.toUpperCase() || 'Unknown'}</p>
+          <button
+            onClick={() => { setHasError(false); setErrorCount(0); setIsLoading(true); }}
+            className="mt-3 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-xs transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -231,10 +275,11 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
       onMouseMove={(e) => { e.stopPropagation(); resetControlTimeout(); }}
       onClick={(e) => { e.stopPropagation(); resetControlTimeout(); }}
     >
-      {/* Video element */}
+      {/* Video element with thumbnail poster */}
       <video
         ref={videoRef}
         src={src}
+        poster={thumbnailDataUrl || undefined}
         className="w-full h-full object-contain"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
@@ -246,10 +291,14 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
         autoPlay
       />
 
-      {/* Loading spinner */}
+      {/* Loading state with spinner */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 pointer-events-none">
-          <div className="w-12 h-12 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 pointer-events-none">
+          <div className="text-center">
+            <div className="w-14 h-14 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-white/80 text-sm font-medium">Loading video...</p>
+            <p className="text-white/50 text-xs mt-1">{filename}</p>
+          </div>
         </div>
       )}
 
