@@ -112,25 +112,12 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
     setCurrentTime(newTime);
   };
 
-  // Volume handler
-  const handleVolumeChange = (e) => {
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    if (videoRef.current) {
-      videoRef.current.volume = newVolume;
-      setIsMuted(newVolume === 0);
-    }
-  };
-
+  // Toggle mute
   const toggleMute = () => {
     if (!videoRef.current) return;
     const newMuted = !isMuted;
     setIsMuted(newMuted);
     videoRef.current.muted = newMuted;
-    if (!newMuted && volume === 0) {
-      setVolume(0.5);
-      videoRef.current.volume = 0.5;
-    }
   };
 
   // Fullscreen handler
@@ -304,46 +291,35 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
         {/* Control buttons */}
         <div className="flex items-center justify-between gap-3">
           {/* Left controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {/* Play/Pause */}
             <button
               onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
+              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
               title={isPlaying ? 'Pause (K)' : 'Play (K)'}
             >
               {isPlaying ? (
-                <FiPause className="text-xl" />
+                <FiPause className="text-lg" />
               ) : (
-                <FiPlay className="text-xl" />
+                <FiPlay className="text-lg" />
               )}
             </button>
 
-            {/* Volume */}
-            <div className="flex items-center gap-2 group/volume">
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
-                title="Mute (M)"
-              >
-                {isMuted || volume === 0 ? (
-                  <FiVolumeX className="text-lg" />
-                ) : (
-                  <FiVolume2 className="text-lg" />
-                )}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={isMuted ? 0 : volume}
-                onChange={(e) => { e.stopPropagation(); handleVolumeChange(e); }}
-                className="w-0 group-hover/volume:w-20 transition-all duration-200 accent-indigo-500"
-              />
-            </div>
+            {/* Volume - mute toggle only */}
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
+              title="Mute (M)"
+            >
+              {isMuted || volume === 0 ? (
+                <FiVolumeX className="text-base" />
+              ) : (
+                <FiVolume2 className="text-base" />
+              )}
+            </button>
 
             {/* Time display */}
-            <span className="text-white text-xs font-medium tabular-nums">
+            <span className="text-white text-xs font-medium tabular-nums ml-1">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           </div>
@@ -354,17 +330,17 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
             {onDownload && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDownload(); }}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
                 title="Download"
               >
-                <FiDownload className="text-lg" />
+                <FiDownload className="text-base" />
               </button>
             )}
 
             {/* Playback speed */}
             <button
               onClick={(e) => { e.stopPropagation(); togglePlaybackSpeed(); }}
-              className="px-2 py-1.5 hover:bg-white/10 rounded-lg transition-colors text-white text-xs font-medium min-w-[45px]"
+              className="px-2 py-1 hover:bg-white/10 rounded-lg transition-colors text-white text-xs font-medium min-w-[40px]"
               title="Playback speed"
             >
               {playbackRate}x
@@ -373,13 +349,13 @@ export const VideoPlayer = ({ src, filename, onDownload }) => {
             {/* Fullscreen */}
             <button
               onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
+              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white"
               title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
             >
               {isFullscreen ? (
-                <FiMinimize className="text-lg" />
+                <FiMinimize className="text-base" />
               ) : (
-                <FiMaximize className="text-lg" />
+                <FiMaximize className="text-base" />
               )}
             </button>
           </div>
