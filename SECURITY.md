@@ -298,33 +298,110 @@ All API endpoints use **Zod** for runtime request validation. This provides:
 
 ## 📝 Logging & Error Handling
 
-### Log Levels
+### File-Based Persistent Logging
 
-| Level | Environment | Description |
-|-------|-------------|-------------|
-| `debug` | Development only | Detailed debugging info |
-| `info` | Development only | General information |
-| `warn` | All environments | Warnings |
-| `error` | All environments | Errors (sanitized) |
+The application uses **Winston** with daily rotating file transport for persistent logging.
+
+#### Log Files Location
+
+```
+server/logs/
+├── error-YYYY-MM-DD.log      # Error logs (14 days retention)
+├── warn-YYYY-MM-DD.log       # Warning logs (14 days retention)
+├── info-YYYY-MM-DD.log       # Info logs (14 days retention)
+├── debug-YYYY-MM-DD.log      # Debug logs (7 days, dev only)
+├── audit-YYYY-MM-DD.log      # Audit trail (90 days retention)
+├── access-YYYY-MM-DD.log     # HTTP access logs (30 days)
+├── exceptions-YYYY-MM-DD.log # Uncaught exceptions (30 days)
+└── rejections-YYYY-MM-DD.log # Unhandled rejections (30 days)
+```
+
+#### Log Levels
+
+| Level | File | Retention | Description |
+|-------|------|-----------|-------------|
+| `error` | `error-*.log` | 14 days | Errors with stack traces |
+| `warn` | `warn-*.log` | 14 days | Warnings and potential issues |
+| `info` | `info-*.log` | 14 days | General information |
+| `debug` | `debug-*.log` | 7 days | Debug details (dev only) |
+| `audit` | `audit-*.log` | 90 days | Security audit trail |
+| `access` | `access-*.log` | 30 days | HTTP request logs |
+
+#### Log Format
+
+```
+2026-03-30 14:32:15 [INFO] HTTP Request {"method":"POST","url":"/api/upload","status":201,"durationMs":145,"ip":"::1","userId":"abc123"}
+2026-03-30 14:32:16 [ERROR] Upload error: File too large
+```
+
+### Access Logging
+
+All HTTP requests are automatically logged with:
+
+- Request ID (for tracing)
+- Method and URL
+- Response status code
+- Duration in milliseconds
+- Client IP address
+- User agent
+- User ID (if authenticated)
+- Authentication method
+
+**Example Access Log:**
+```json
+{
+  "requestId": "1711808535-x9k2m4p1q",
+  "method": "POST",
+  "url": "/api/upload",
+  "status": 201,
+  "durationMs": 145,
+  "ip": "192.168.1.100",
+  "userAgent": "Mozilla/5.0...",
+  "userId": "Qi82fxj0G2NaiphOG3V6ce8dWe73",
+  "authMethod": "api-key"
+}
+```
+
+### Audit Logging
+
+Sensitive operations are logged to `audit-*.log`:
+
+- API key creation/revocation
+- Admin operations
+- Role changes
+- Bulk operations
+- Failed authentication attempts
 
 ### Production Safety
 
-✅ Stack traces hidden in production  
-✅ Sensitive data not logged in production  
-✅ Error messages sanitized  
-✅ User IDs masked in production logs
+✅ Stack traces only in error logs  
+✅ Sensitive data sanitized  
+✅ Log rotation prevents disk exhaustion  
+✅ Audit trail for compliance  
+✅ Request tracing with request IDs  
 
-### Example
+### Log Management
 
-```javascript
-// Development
-[ERROR] Upload error: Multer error: file too large
-    at multerMiddleware (/app/routes/api.js:123:5)
-    ...
+```bash
+# View today's error log
+tail -f server/logs/error-$(date +%Y-%m-%d).log
 
-// Production
-[ERROR] Upload error: Multer error: file too large
+# Search access logs for specific user
+grep "userId" server/logs/access-*.log
+
+# Count requests per hour
+cat server/logs/access-*.log | cut -d' ' -f2 | cut -d':' -f1 | uniq -c
+
+# Clean old logs (manual if needed)
+find server/logs -name "*.log" -mtime +30 -delete
 ```
+
+### Configuration
+
+| Env Variable | Default | Description |
+|--------------|---------|-------------|
+| `LOG_LEVEL` | `debug` | Minimum log level |
+| `NODE_ENV` | `development` | Controls debug log output |
 
 ---
 
@@ -394,13 +471,15 @@ All API endpoints use **Zod** for runtime request validation. This provides:
 
 2. **Request Validation** - ✅ **RESOLVED**: Zod validation implemented for all critical endpoints.
 
+3. **Persistent Logging** - ✅ **RESOLVED**: Winston with daily rotating files, audit trail, and access logging implemented.
+
 ### 🔄 Remaining
 
-3. **File Content Scanning:** Files are not scanned for malware. Consider adding ClamAV or VirusTotal integration for sensitive deployments.
+4. **File Content Scanning:** Files are not scanned for malware. Consider adding ClamAV or VirusTotal integration for sensitive deployments.
 
-4. **Advanced Audit Logging:** Basic usage tracking exists (API key usageCount, lastUsedAt). Full audit logging with detailed action trails is not implemented.
+5. **Advanced Audit Logging:** Basic usage tracking exists (API key usageCount, lastUsedAt). Full audit logging with detailed action trails is not implemented.
 
-5. **IP-based Blocking:** Rate limiting provides per-IP protection. Advanced IP reputation blocking requires external service (e.g., Cloudflare, AWS WAF).
+6. **IP Reputation Blocking:** Rate limiting provides per-IP protection. Advanced IP reputation blocking requires external service (e.g., Cloudflare, AWS WAF).
 
 ---
 

@@ -7,6 +7,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const moduleAlias = require('module-alias');
+const { logger } = require('@lib/logger');
+const { requestLogger } = require('@middleware/request-logger');
 
 // Register absolute imports
 moduleAlias.addAliases({
@@ -89,6 +91,9 @@ app.use('/api/download', downloadLimiter);
 // Middleware
 app.use(express.json({ limit: '1mb' })); // Limit request size
 
+// Request logging (after rate limiting, before routes)
+app.use(requestLogger);
+
 // API Routes
 app.use('/api', apiRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
@@ -113,11 +118,22 @@ if (require('fs').existsSync(clientDist)) {
 // Start server
 app.listen(PORT, () => {
   const uploadPath = path.join(__dirname, 'uploads');
-  console.log(`
+  const logsPath = path.join(__dirname, 'logs');
+  
+  logger.info('Cloud Storage Server started', {
+    port: PORT,
+    env: process.env.NODE_ENV || 'development',
+    uploadsPath: uploadPath,
+    logsPath: logsPath
+  });
+  
+  logger.info(`
+========================================
 Cloud Storage Server
 ========================================
 Server:    http://localhost:${PORT}
 Uploads:   ${uploadPath}
+Logs:      ${logsPath}
 
 API Keys:
   POST   /api/api-keys              - Generate
@@ -145,6 +161,5 @@ Storage:
   GET    /api/file/:name      - File info
   DELETE /api/delete/:name    - Delete
   GET    /api/storage-stats   - Usage stats
-========================================
-  `);
+========================================`);
 });
