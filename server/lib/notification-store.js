@@ -1,4 +1,5 @@
 const { db } = require('./firebase-admin');
+const logger = require('./logger');
 
 const NOTIFICATIONS_COLLECTION = 'notifications';
 const USER_NOTIFICATIONS_COLLECTION = 'user_notifications';
@@ -78,9 +79,9 @@ const createUserNotificationsForAll = async (notification) => {
     });
 
     await batch.commit();
-    console.log(`[Notification] Broadcast to ${userIds.size} users`);
+    logger.info(`[Notification] Broadcast to ${userIds.size} users`);
   } catch (error) {
-    console.error('[Notification] Error creating broadcast:', error);
+    logger.error('[Notification] Error creating broadcast:', error.message);
   }
 };
 
