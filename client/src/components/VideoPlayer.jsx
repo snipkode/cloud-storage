@@ -49,7 +49,8 @@ export const VideoPlayer = ({
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isTranscoding, setIsTranscoding] = useState(false);
   const [currentStreamUrl, setCurrentStreamUrl] = useState(null);
-  const [useFallbackSrc, setUseFallbackSrc] = useState(false); // Fallback to direct src if streaming fails
+  const [useFallbackSrc, setUseFallbackSrc] = useState(false);
+  const [videoOrientation, setVideoOrientation] = useState('unknown');
 
   const controlTimeoutRef = useRef(null);
 
@@ -208,12 +209,20 @@ export const VideoPlayer = ({
     const video = videoRef.current;
     setDuration(video?.duration || 0);
     setIsLoading(false);
+    
+    // Detect video orientation
+    const width = video?.videoWidth || 0;
+    const height = video?.videoHeight || 0;
+    const orientation = height > width ? 'portrait' : 'landscape';
+    setVideoOrientation(orientation);
+    
     console.log('[VideoPlayer] Metadata loaded:', {
       readyState: video?.readyState,
       networkState: video?.networkState,
       duration: video?.duration,
-      videoWidth: video?.videoWidth,
-      videoHeight: video?.videoHeight,
+      videoWidth: width,
+      videoHeight: height,
+      orientation,
       src: video?.src?.substring(0, 100),
       canPlayType: video?.canPlayType?.('video/mp4')
     });
@@ -622,8 +631,10 @@ export const VideoPlayer = ({
   return (
     <div
       ref={containerRef}
-      className={`relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] ${
-        isFullscreen ? '' : 'aspect-video'
+      className={`relative group bg-black overflow-hidden ${
+        isFullscreen && videoOrientation === 'portrait'
+          ? 'fixed inset-0 z-50 h-screen w-auto max-w-none rounded-none'
+          : 'w-full max-w-[90vw] aspect-video rounded-lg'
       }`}
       onMouseMove={(e) => { e.stopPropagation(); resetControlTimeout(); }}
       onClick={(e) => {
@@ -641,7 +652,13 @@ export const VideoPlayer = ({
         key={currentStreamUrl || src || 'no-src'}
         src={getStreamUrl()}
         poster={thumbnailDataUrl || undefined}
-        className="absolute inset-0 w-full h-full object-contain bg-black z-10"
+        className="absolute inset-0 bg-black z-10"
+        style={{
+          width: '100%',
+          height: isFullscreen ? '100%' : 'auto',
+          minHeight: isFullscreen ? '100%' : '100%',
+          objectFit: 'contain'
+        }}
         preload="auto"
         muted={isMuted}
         onTimeUpdate={handleTimeUpdate}
