@@ -349,10 +349,10 @@ function ApiKeys() {
         </button>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
+          className="flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-lg shadow-indigo-500/25"
         >
-          <FiPlus className="text-sm" />
-          <span>New Key</span>
+          <FiPlus className="text-xs" />
+          <span className="hidden sm:inline">Create</span>
         </button>
       </div>
 
