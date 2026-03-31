@@ -622,7 +622,9 @@ export const VideoPlayer = ({
   return (
     <div
       ref={containerRef}
-      className="relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] aspect-video"
+      className={`relative group bg-black rounded-lg overflow-hidden w-full max-w-[90vw] ${
+        isFullscreen ? '' : 'aspect-video'
+      }`}
       onMouseMove={(e) => { e.stopPropagation(); resetControlTimeout(); }}
       onClick={(e) => {
         e.stopPropagation();
