@@ -181,6 +181,29 @@ const getFileByOriginalname = async (originalname, userId, environment = 'live')
 };
 
 /**
+ * Get file metadata by partial filename match (for files with timestamp prefix)
+ * Matches files where filename ends with the provided name
+ */
+const getFileByPartialFilename = async (partialName, userId, environment = 'live') => {
+  const snapshot = await db.collection(FILES_COLLECTION)
+    .where('userId', '==', userId)
+    .where('environment', '==', environment)
+    .get();
+
+  if (snapshot.empty) return null;
+
+  // Find file where filename or originalname ends with partialName
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    if (data.filename?.endsWith(partialName) || data.originalname?.endsWith(partialName)) {
+      return { id: doc.id, ...data };
+    }
+  }
+
+  return null;
+};
+
+/**
  * Get file metadata by ID
  */
 const getFileById = async (id, environment = 'live') => {
@@ -273,6 +296,7 @@ module.exports = {
   createFile,
   getFileByFilename,
   getFileByOriginalname,
+  getFileByPartialFilename,
   getFileById,
   getUserFiles,
   incrementDownloadCount,

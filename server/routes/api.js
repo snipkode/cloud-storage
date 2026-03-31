@@ -125,20 +125,20 @@ const getPhysicalFolderPath = (uid, environment = 'live', folderPath = '/') => {
  */
 const findFilePath = (uid, environment, fileMeta) => {
   if (!fileMeta || !fileMeta.filename) return null;
-  
+
   const filename = fileMeta.filename;
   const possiblePaths = [];
-  
+
   // 1. Try folder path from metadata first
   if (fileMeta.path) {
     const physicalFolderPath = getPhysicalFolderPath(uid, environment, fileMeta.path);
     possiblePaths.push(path.join(physicalFolderPath, filename));
   }
-  
+
   // 2. Try flat user directory
   const userDir = getUserDir(uid, environment);
   possiblePaths.push(path.join(userDir, filename));
-  
+
   // 3. Try nested subfolders
   try {
     if (fs.existsSync(userDir)) {
@@ -153,7 +153,7 @@ const findFilePath = (uid, environment, fileMeta) => {
   } catch (e) {
     // Ignore errors
   }
-  
+
   // Find the file
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) {
@@ -265,17 +265,27 @@ router.post('/upload',
     }
 
     // Save metadata to Firestore with folder path
-    const fileMetadata = await fileMetadataStore.createFile({
-      filename: req.file.filename,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-      userId: req.user.uid,
-      path: savePath,  // Use folder path if provided
-      environment: env
-    });
+    try {
+      logger.info(`[Upload] Creating file metadata: ${req.file.originalname}, size: ${req.file.size}, env: ${env}, uid: ${req.user.uid}`);
+      
+      const fileMetadata = await fileMetadataStore.createFile({
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        userId: req.user.uid,
+        path: savePath,  // Use folder path if provided
+        environment: env
+      });
 
-    logger.debug(`[Upload] Saved metadata: ${fileMetadata.filename} to ${fileMetadata.path}`);
+      logger.info(`[Upload] Saved metadata: ${fileMetadata.filename} to ${fileMetadata.path}`);
+    } catch (firestoreError) {
+      logger.error(`[Upload] Firestore createFile failed: ${firestoreError.message}`, {
+        code: firestoreError.code,
+        details: firestoreError.details
+      });
+      throw firestoreError;
+    }
 
     // Trigger background transcoding for video files
     const filePath = req.file.path;
@@ -564,6 +574,22 @@ router.get('/download/:filename',
   }
 });
 
+// Valid quality options for streaming
+const VALID_QUALITIES = ['480p', '720p', '1080p', 'original'];
+
+// Transcoding lock map to prevent duplicate concurrent transcodes
+const transcodeLocks = new Map();
+
+// Handle CORS preflight for stream endpoint
+router.options('/stream/:filename', (req, res) => {
+  logger.debug(`[Stream] CORS preflight for: ${req.params.filename}`);
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.status(204).send();
+});
+
 // Stream video with HTTP Range support (for video player)
 // Optional query params: ?quality=480p|720p|1080p&environment=test|live
 router.get('/stream/:filename',
@@ -573,9 +599,8 @@ router.get('/stream/:filename',
   try {
     const queryEnv = req.query.environment;
     const baseEnv = req.user.environment || 'live';
-    const quality = req.query.quality || '720p';
 
-    logger.debug(`[Stream] User: ${req.user.uid}, Env: ${baseEnv}, Quality: ${quality}`);
+    logger.debug(`[Stream] User: ${req.user.uid}, API Key Env: ${baseEnv}, Query Env: ${queryEnv || 'none'}`);
 
     // Environment selection logic (same as download)
     let env;
@@ -587,30 +612,30 @@ router.get('/stream/:filename',
       env = baseEnv;
     }
 
+    logger.debug(`[Stream] Using environment: ${env}`);
+
     // Sanitize filename
     const filename = sanitizeFilename(req.params.filename);
 
-    logger.debug(`[Stream] Looking for file: ${filename}, User: ${req.user.uid}, Env: ${env}`);
+    logger.debug(`[Stream] Looking for: ${filename}, User: ${req.user.uid}, Env: ${env}`);
 
     // Get file metadata from Firestore - try filename first
     let fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
 
-    // If not found, try searching by originalname (for backward compatibility)
+    // If not found, try originalname
     if (!fileMetadata) {
-      logger.debug(`[Stream] Not found by filename, trying originalname: ${filename}`);
+      logger.debug(`[Stream] Not found by filename, trying originalname`);
       fileMetadata = await fileMetadataStore.getFileByOriginalname(filename, req.user.uid, env);
     }
 
-    logger.debug(`[Stream] Firestore metadata:`, fileMetadata ? { 
-      filename: fileMetadata.filename, 
-      originalname: fileMetadata.originalname,
-      path: fileMetadata.path 
-    } : 'NOT FOUND');
+    // If still not found, try partial match (for files with timestamp prefix)
+    if (!fileMetadata) {
+      logger.debug(`[Stream] Not found, trying partial match`);
+      fileMetadata = await fileMetadataStore.getFileByPartialFilename(filename, req.user.uid, env);
+    }
 
     // Find file in current environment
     let filePath = findFilePath(req.user.uid, env, fileMetadata);
-
-    logger.debug(`[Stream] File path from findFilePath:`, filePath);
 
     // If not found, try other environment
     if (!filePath) {
@@ -618,53 +643,137 @@ router.get('/stream/:filename',
       const otherFileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, otherEnv);
       const otherFilePath = findFilePath(req.user.uid, otherEnv, otherFileMetadata);
 
+      logger.debug(`[Stream] File not found in ${env}, trying ${otherEnv}`);
+
       if (otherFilePath) {
+        logger.debug(`[Stream] Found file in ${otherEnv}`);
         env = otherEnv;
         filePath = otherFilePath;
+        fileMetadata = otherFileMetadata;
       } else {
+        logger.debug(`[Stream] File not found in either environment via metadata`);
+      }
+    }
+
+    // Fallback: Search for file physically if metadata not found
+    // This handles cases where file was uploaded but metadata wasn't saved to Firestore
+    if (!filePath) {
+      const userDir = path.join(env === 'test' ? TEST_UPLOADS_DIR : UPLOADS_DIR, req.user.uid);
+      const otherUserDir = path.join(env === 'test' ? UPLOADS_DIR : TEST_UPLOADS_DIR, req.user.uid);
+      
+      // Try to find file by matching filename in user's directory
+      const findPhysicalFile = (dir, searchFilename) => {
+        if (!fs.existsSync(dir)) return null;
+        try {
+          const files = fs.readdirSync(dir);
+          for (const file of files) {
+            const fullPath = path.join(dir, file);
+            const stat = fs.statSync(fullPath);
+            if (stat.isFile() && (file === searchFilename || file.includes(searchFilename))) {
+              return fullPath;
+            }
+          }
+        } catch (e) {
+          logger.debug(`[Stream] Error scanning directory: ${e.message}`);
+        }
+        return null;
+      };
+
+      filePath = findPhysicalFile(userDir, filename);
+      if (!filePath) {
+        filePath = findPhysicalFile(otherUserDir, filename);
+        if (filePath) {
+          env = env === 'test' ? 'live' : 'test';
+          logger.debug(`[Stream] Found physical file in ${env}`);
+        }
+      }
+
+      if (filePath) {
+        logger.info(`[Stream] Found file physically (no metadata): ${filename}`);
+        // Create minimal metadata for file info
+        fileMetadata = {
+          filename: filename,
+          originalname: filename,
+          mimetype: 'video/mp4' // Default for now, will be detected later
+        };
+      } else {
+        logger.error(`[Stream] File not found: ${filename}`);
         return res.status(404).json({
           error: 'File not found',
-          details: `File ${filename} not found`
+          details: `File ${filename} not found in storage`
         });
       }
     }
 
     logger.debug(`[Stream] File path: ${filePath}`);
 
+    // Validate quality parameter
+    let quality = req.query.quality || '720p';
+    if (!VALID_QUALITIES.includes(quality)) {
+      logger.warn(`[Stream] Invalid quality '${quality}', defaulting to 720p`);
+      quality = '720p';
+    }
+
     // Check if file is a video that can be transcoded
     const isVideo = fileMetadata?.mimetype?.includes('video') ||
                     transcodeLib.needsTranscoding(filename);
 
-    // For MP4 files or original quality, always stream original
-    // For other formats with transcoding enabled, try transcoded version
+    // For original quality, always stream original file
+    // For other qualities, try transcoded version (including MP4 files)
     let streamPath = filePath;
     const isMP4 = filename.toLowerCase().endsWith('.mp4');
     const isOriginalQuality = quality === 'original';
 
-    if (isVideo && !isMP4 && !isOriginalQuality && transcodeLib.TRANSCODE_CONFIG.enabled) {
-      // Non-MP4 video: try to use transcoded version
+    if (isVideo && !isOriginalQuality && transcodeLib.TRANSCODE_CONFIG.enabled) {
+      // Try to use transcoded version for any quality other than original
       const cachedPath = transcodeLib.getCachedPath(filePath, quality);
       if (fs.existsSync(cachedPath)) {
         streamPath = cachedPath;
         logger.debug(`[Stream] Using transcoded cache: ${quality}`);
       } else {
-        // Start background transcode for next time
-        logger.info(`[Stream] Starting background transcode for: ${filename}`);
-        transcodeLib.transcode(filePath, quality, (err) => {
-          if (err) {
-            logger.error(`[Stream] Background transcode failed: ${err.message}`);
-          } else {
-            logger.info(`[Stream] Background transcode complete: ${filename}`);
-          }
-        });
+        // Start background transcode for next time (with lock to prevent duplicates)
+        const transcodeKey = `${filePath}:${quality}`;
+        if (!transcodeLocks.has(transcodeKey)) {
+          transcodeLocks.set(transcodeKey, true);
+          logger.info(`[Stream] Starting background transcode for: ${filename}`);
+          transcodeLib.transcode(filePath, quality, (err) => {
+            transcodeLocks.delete(transcodeKey);
+            if (err) {
+              logger.error(`[Stream] Background transcode failed: ${err.message}`);
+            } else {
+              logger.info(`[Stream] Background transcode complete: ${filename}`);
+            }
+          });
+        } else {
+          logger.debug(`[Stream] Transcode already in progress for: ${filename}`);
+        }
+        
+        // If no cached version exists, fall back to original file
+        logger.debug(`[Stream] No transcode cache, using original: ${filename}`);
       }
-    } else if (isMP4 || isOriginalQuality) {
-      logger.debug(`[Stream] Streaming original: ${filename} (MP4: ${isMP4}, Original: ${isOriginalQuality})`);
+    } else if (isOriginalQuality) {
+      logger.debug(`[Stream] Streaming original quality: ${filename}`);
+    }
+
+    // Validate streamPath before proceeding
+    if (!streamPath) {
+      logger.error(`[Stream] Stream path is null/undefined for: ${filename}`);
+      return res.status(500).json({ error: 'Streaming error', details: 'File path not found' });
     }
 
     // Get file stats
     const stats = fs.statSync(streamPath);
     const fileSize = stats.size;
+
+    // Check file size limit (default 10GB)
+    const maxFileSize = parseInt(process.env.STREAM_MAX_FILE_SIZE, 10) || (10 * 1024 * 1024 * 1024);
+    if (fileSize > maxFileSize) {
+      logger.warn(`[Stream] File too large: ${fileSize} bytes (max: ${maxFileSize})`);
+      return res.status(413).json({ 
+        error: 'File too large', 
+        details: `File size ${fileSize} bytes exceeds maximum allowed size ${maxFileSize} bytes` 
+      });
+    }
 
     logger.debug(`[Stream] File: ${filename}, Size: ${fileSize} bytes, Path: ${streamPath}`);
 
@@ -685,34 +794,97 @@ router.get('/stream/:filename',
     // Set headers for video streaming
     res.setHeader('Content-Type', contentType);
     res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Authorization, Content-Type');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
     res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
     // Handle HTTP Range requests (critical for video seeking)
     const range = req.headers.range;
-    
-    logger.debug(`[Stream] Range header: ${range || 'none'}`);
-    
+
+    logger.info(`[Stream] Request: ${filename}, Range: ${range || 'none'}, UA: ${req.headers['user-agent']?.substring(0, 50)}`);
+
     if (range) {
       const parts = range.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
       const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunkSize = (end - start) + 1;
 
-      logger.debug(`[Stream] Range: ${start}-${end} (${chunkSize} bytes)`);
+      // Validate range values
+      if (isNaN(start) || isNaN(end) || start < 0 || end < start) {
+        logger.warn(`[Stream] Invalid range header: ${range}`);
+        return res.status(416).json({ error: 'Range Not Satisfiable' });
+      }
 
-      res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+      // Clamp range to valid bounds
+      const validStart = Math.max(0, Math.min(start, fileSize - 1));
+      const validEnd = Math.max(validStart, Math.min(end, fileSize - 1));
+      const chunkSize = (validEnd - validStart) + 1;
+
+      logger.debug(`[Stream] Range: ${validStart}-${validEnd} (${chunkSize} bytes)`);
+
+      res.setHeader('Content-Range', `bytes ${validStart}-${validEnd}/${fileSize}`);
       res.setHeader('Content-Length', chunkSize);
       res.status(206); // Partial Content
 
-      const stream = fs.createReadStream(streamPath, { start, end, highWaterMark: 64 * 1024 });
+      const stream = fs.createReadStream(streamPath, { start: validStart, end: validEnd, highWaterMark: 64 * 1024 });
+      
+      // Handle stream errors
+      stream.on('error', (err) => {
+        logger.error(`[Stream] Read stream error: ${err.message}`);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Streaming error' });
+        } else {
+          res.end();
+        }
+      });
+
+      // Handle client abort
+      req.on('close', () => {
+        logger.debug(`[Stream] Client closed connection`);
+        stream.destroy();
+      });
+
       stream.pipe(res);
     } else {
       // No range header - send full file
+      logger.info(`[Stream] Sending full file: ${fileSize} bytes`);
       res.setHeader('Content-Length', fileSize);
       res.status(200);
 
       const stream = fs.createReadStream(streamPath, { highWaterMark: 64 * 1024 });
+      
+      let bytesSent = 0;
+
+      // Handle stream errors
+      stream.on('error', (err) => {
+        logger.error(`[Stream] Read stream error: ${err.message}`);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Streaming error' });
+        } else {
+          res.end();
+        }
+      });
+
+      // Track bytes sent
+      stream.on('data', (chunk) => {
+        bytesSent += chunk.length;
+        if (bytesSent === chunk.length) {
+          logger.debug(`[Stream] Started sending...`);
+        }
+      });
+
+      // Handle client abort
+      req.on('close', () => {
+        logger.debug(`[Stream] Client closed connection, sent: ${bytesSent} bytes`);
+        stream.destroy();
+      });
+
+      stream.on('end', () => {
+        logger.info(`[Stream] Complete: ${bytesSent} bytes sent`);
+      });
+
       stream.pipe(res);
     }
 
@@ -741,20 +913,53 @@ router.get('/stream/:filename/qualities',
     let env = baseEnv === 'test' ? 'test' : (queryEnv || 'live');
 
     const filename = sanitizeFilename(req.params.filename);
-    
-    logger.debug(`[Qualities] Looking for: ${filename}, User: ${req.user.uid}, Env: ${env}`);
-    
+
+    logger.info(`[Qualities] Request: filename="${filename}", uid="${req.user.uid}", env="${env}", baseEnv="${baseEnv}", queryEnv="${queryEnv || 'none'}"`);
+
     // Try filename first, then originalname
     let fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, env);
-    
+
+    logger.debug(`[Qualities] Search by filename in ${env}:`, fileMetadata ? 'FOUND' : 'NOT FOUND');
+
     if (!fileMetadata) {
       logger.debug(`[Qualities] Not found by filename, trying originalname: ${filename}`);
       fileMetadata = await fileMetadataStore.getFileByOriginalname(filename, req.user.uid, env);
+      logger.debug(`[Qualities] Search by originalname in ${env}:`, fileMetadata ? 'FOUND' : 'NOT FOUND');
+    }
+
+    // If still not found, try partial match (for files with timestamp prefix)
+    if (!fileMetadata) {
+      logger.debug(`[Qualities] Not found, trying partial match`);
+      fileMetadata = await fileMetadataStore.getFileByPartialFilename(filename, req.user.uid, env);
+      logger.debug(`[Qualities] Search by partial match in ${env}:`, fileMetadata ? 'FOUND' : 'NOT FOUND');
+    }
+
+    // If still not found, try other environment
+    if (!fileMetadata) {
+      const otherEnv = env === 'test' ? 'live' : 'test';
+      logger.debug(`[Qualities] Not found in ${env}, trying ${otherEnv}`);
+      fileMetadata = await fileMetadataStore.getFileByFilename(filename, req.user.uid, otherEnv);
+      if (!fileMetadata) {
+        fileMetadata = await fileMetadataStore.getFileByOriginalname(filename, req.user.uid, otherEnv);
+      }
+      if (fileMetadata) {
+        env = otherEnv;
+        logger.info(`[Qualities] Found in ${otherEnv}`);
+      }
     }
 
     if (!fileMetadata) {
-      logger.warn(`[Qualities] File not found: ${filename}`);
-      return res.status(404).json({ error: 'File not found' });
+      logger.warn(`[Qualities] File not found in Firestore: filename="${filename}", uid="${req.user.uid}"`);
+      // List all files for this user for debugging
+      try {
+        const allFilesLive = await fileMetadataStore.getFiles(req.user.uid, 'live');
+        const allFilesTest = await fileMetadataStore.getFiles(req.user.uid, 'test');
+        logger.warn(`[Qualities] User has ${allFilesLive.length} files in live:`, allFilesLive.map(f => f.originalname).join(', '));
+        logger.warn(`[Qualities] User has ${allFilesTest.length} files in test:`, allFilesTest.map(f => f.originalname).join(', '));
+      } catch (e) {
+        logger.error(`[Qualities] Failed to list user files: ${e.message}`);
+      }
+      return res.status(404).json({ error: 'File not found', details: 'File metadata not found in database' });
     }
 
     const filePath = findFilePath(req.user.uid, env, fileMetadata);
@@ -785,7 +990,8 @@ router.get('/stream/:filename/qualities',
         codec: metadata.codec
       };
     } catch (e) {
-      // Metadata extraction failed, use basic info
+      // Metadata extraction failed, use basic info - log for debugging
+      logger.debug(`[Qualities] Metadata extraction failed for ${filename}: ${e.message}`);
     }
 
     res.json({

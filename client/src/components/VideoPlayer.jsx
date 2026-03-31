@@ -1,13 +1,32 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize, FiMinimize,
-  FiSkipBack, FiSkipForward, FiSettings, FiDownload, FiFilm, FiCast
+  FiSkipBack, FiSkipForward, FiSettings, FiDownload, FiFilm, FiCast, FiRotateCw
 } from 'react-icons/fi';
 
 /**
  * Beautiful compact video player with advanced controls
  * Supports streaming with transcoding and quality selection
  */
+
+// CSS for rotated video in fullscreen
+const rotateStyles = `
+  .rotate-container {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  .rotated-video {
+    transform: rotate(90deg);
+    transform-origin: center center;
+    object-fit: contain;
+  }
+`;
 
 // Reusable control button component
 const ControlButton = ({ onClick, icon: Icon, title, children, className = '' }) => (
@@ -51,6 +70,8 @@ export const VideoPlayer = ({
   const [currentStreamUrl, setCurrentStreamUrl] = useState(null);
   const [useFallbackSrc, setUseFallbackSrc] = useState(false);
   const [videoOrientation, setVideoOrientation] = useState('unknown');
+  const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+  const [isRotated, setIsRotated] = useState(false);
 
   const controlTimeoutRef = useRef(null);
 
@@ -210,11 +231,13 @@ export const VideoPlayer = ({
     setDuration(video?.duration || 0);
     setIsLoading(false);
     
-    // Detect video orientation
+    // Detect video orientation and aspect ratio
     const width = video?.videoWidth || 0;
     const height = video?.videoHeight || 0;
     const orientation = height > width ? 'portrait' : 'landscape';
+    const aspectRatio = width / height;
     setVideoOrientation(orientation);
+    setVideoAspectRatio(aspectRatio);
     
     console.log('[VideoPlayer] Metadata loaded:', {
       readyState: video?.readyState,
@@ -223,6 +246,7 @@ export const VideoPlayer = ({
       videoWidth: width,
       videoHeight: height,
       orientation,
+      aspectRatio,
       src: video?.src?.substring(0, 100),
       canPlayType: video?.canPlayType?.('video/mp4')
     });
@@ -444,7 +468,13 @@ export const VideoPlayer = ({
     } else {
       document.exitFullscreen();
       setIsFullscreen(false);
+      setIsRotated(false); // Reset rotation when exiting fullscreen
     }
+  }, []);
+
+  // Rotate toggle for portrait videos
+  const toggleRotate = useCallback(() => {
+    setIsRotated(prev => !prev);
   }, []);
 
   // Playback speed toggle
@@ -476,6 +506,12 @@ export const VideoPlayer = ({
         case 'm':
           e.preventDefault();
           toggleMute();
+          break;
+        case 'r':
+          e.preventDefault();
+          if (isFullscreen) {
+            toggleRotate();
+          }
           break;
         case 'arrowleft':
           e.preventDefault();
@@ -629,38 +665,49 @@ export const VideoPlayer = ({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative group bg-black overflow-hidden ${
-        isFullscreen && videoOrientation === 'portrait'
-          ? 'fixed inset-0 z-50 h-screen w-auto max-w-none rounded-none'
-          : 'w-full max-w-[90vw] aspect-video rounded-lg'
-      }`}
+    <>
+      <style>{rotateStyles}</style>
+      <div
+        ref={containerRef}
+        className={`relative group bg-black overflow-hidden flex items-center justify-center ${
+          isFullscreen
+            ? 'fixed inset-0 z-50 h-screen w-screen max-w-none rounded-none'
+            : videoOrientation === 'portrait'
+              ? 'w-full max-w-[90vw] h-[70vh] rounded-lg'
+              : 'w-full max-w-[90vw] aspect-video rounded-lg'
+        }`}
       onMouseMove={(e) => { e.stopPropagation(); resetControlTimeout(); }}
       onClick={(e) => {
         e.stopPropagation();
-        // Toggle play when clicking on video area (not controls)
         if (!e.target.closest('button') && !e.target.closest('[role="button"]')) {
           togglePlay();
         }
         resetControlTimeout();
       }}
     >
-      {/* Video element with thumbnail poster */}
-      <video
-        ref={videoRef}
-        key={currentStreamUrl || src || 'no-src'}
-        src={getStreamUrl()}
-        poster={thumbnailDataUrl || undefined}
-        className="absolute inset-0 bg-black z-10"
-        style={{
-          width: '100%',
-          height: isFullscreen ? '100%' : 'auto',
-          minHeight: isFullscreen ? '100%' : '100%',
-          objectFit: 'contain'
-        }}
-        preload="auto"
-        muted={isMuted}
+      {/* Video wrapper - rotated when needed */}
+      <div className={`w-full h-full flex items-center justify-center ${
+        isFullscreen && isRotated ? 'rotate-container' : ''
+      }`}>
+        {/* Video element with thumbnail poster */}
+        <video
+          ref={videoRef}
+          key={currentStreamUrl || src || 'no-src'}
+          src={getStreamUrl()}
+          poster={thumbnailDataUrl || undefined}
+          className={`w-full h-full object-contain relative z-20 ${
+            isFullscreen && isRotated ? 'rotated-video' : ''
+          }`}
+          style={isFullscreen && isRotated && videoAspectRatio ? {
+            width: videoAspectRatio < 1 
+              ? `${100 / videoAspectRatio}vh`  // portrait: width based on screen height
+              : `${100 * videoAspectRatio}vw`, // landscape: width based on screen width
+            height: videoAspectRatio < 1
+              ? `${100 * videoAspectRatio}vw`  // portrait: height based on screen width  
+              : `${100 / videoAspectRatio}vh`, // landscape: height based on screen height
+          } : undefined}
+          preload="auto"
+          muted={isMuted}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onCanPlay={handleCanPlay}
@@ -688,22 +735,11 @@ export const VideoPlayer = ({
         onClick={(e) => { e.stopPropagation(); togglePlay(); }}
         playsInline
       />
-
-      {/* Default placeholder when no video loaded */}
-      {!src && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 z-0">
-          <div className="text-center">
-            <div className="w-24 h-24 bg-white/5 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
-              <FiFilm className="text-5xl text-white/40" />
-            </div>
-            <p className="text-white/60 text-sm font-medium">No video loaded</p>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Loading state with spinner */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 pointer-events-none z-30">
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 pointer-events-none z-10">
           <div className="text-center">
             <div className="w-14 h-14 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
             <p className="text-white/80 text-sm font-medium">Loading video...</p>
@@ -713,6 +749,18 @@ export const VideoPlayer = ({
                 <FiCast className="animate-pulse" /> Transcoding...
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Default placeholder when no video loaded */}
+      {!src && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 z-0">
+          <div className="text-center">
+            <div className="w-24 h-24 bg-white/5 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+              <FiFilm className="text-5xl text-white/40" />
+            </div>
+            <p className="text-white/60 text-sm font-medium">No video loaded</p>
           </div>
         </div>
       )}
@@ -851,6 +899,15 @@ export const VideoPlayer = ({
               <span>{playbackRate}x</span>
             </ControlButton>
 
+            {isFullscreen && (
+              <ControlButton
+                onClick={(e) => { e.stopPropagation(); toggleRotate(); }}
+                icon={FiRotateCw}
+                title="Rotate (video portrait)"
+                className={`w-8 h-8 ${videoOrientation === 'portrait' ? 'text-indigo-400' : 'text-white/50'}`}
+              />
+            )}
+
             <ControlButton
               onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
               icon={isFullscreen ? FiMinimize : FiMaximize}
@@ -890,6 +947,7 @@ export const VideoPlayer = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 

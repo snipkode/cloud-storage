@@ -3,7 +3,7 @@ import {
   FiGrid, FiList, FiPlus, FiSearch, FiMoreVertical, FiDownload,
   FiTrash2, FiFolder, FiX, FiUpload, FiCheck, FiCheckSquare, FiCloud, FiFile,
   FiImage, FiFilm, FiMusic, FiCode, FiSettings, FiBook, FiBarChart, FiInfo,
-  FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut
+  FiChevronLeft, FiChevronRight, FiZoomIn, FiZoomOut, FiPlay
 } from 'react-icons/fi';
 import { useAuthStore } from '@store/authStore';
 import { useFilesStore } from '@store/filesStore';
@@ -115,6 +115,7 @@ function FileBrowser() {
   const [previewFiles, setPreviewFiles] = useState([]);
   const [zoom, setZoom] = useState(1);
   const [thumbnailUrls, setThumbnailUrls] = useState({});
+  const [videoThumbnails, setVideoThumbnails] = useState({});
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
@@ -186,19 +187,26 @@ function FileBrowser() {
     };
   }, [previewIndex, previewOpen, previewFiles]);
 
+  // Get streaming URL for video thumbnail generation
+  const getVideoStreamingUrl = useCallback(async (file) => {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const cleanFilename = file.filename.split('/').pop();
+    return `${API_BASE}/api/stream/${encodeURIComponent(cleanFilename)}?token=${encodeURIComponent(token)}`;
+  }, [token]);
+
   // Load thumbnails for images
   useEffect(() => {
     const loadThumbnails = async () => {
       const imageFiles = files.filter(f => f.mimetype?.includes('image'));
       const urls = {};
-      
+
       for (const file of imageFiles) {
         const url = await getPreviewUrl(file);
         if (url) {
           urls[file.id || file.filename] = url;
         }
       }
-      
+
       setThumbnailUrls(urls);
     };
 
@@ -213,6 +221,85 @@ function FileBrowser() {
       });
     };
   }, [files]);
+
+  // Generate thumbnails for videos
+  useEffect(() => {
+    const generateVideoThumbnails = async () => {
+      const videoFiles = files.filter(f => f.mimetype?.includes('video'));
+      console.log('[VideoThumbnail] Found video files:', videoFiles.length);
+      const thumbnails = {};
+
+      for (const file of videoFiles) {
+        try {
+          const url = await getVideoStreamingUrl(file);
+          console.log('[VideoThumbnail] Stream URL for', file.filename, ':', url.substring(0, 80));
+          if (!url) continue;
+
+          // Create video element to extract frame
+          const video = document.createElement('video');
+          video.src = url;
+          video.crossOrigin = 'anonymous';
+          video.muted = true;
+          video.preload = 'metadata';
+
+          // Wait for metadata then seek to 10% or 5 seconds
+          await new Promise((resolve) => {
+            video.addEventListener('loadedmetadata', () => {
+              console.log('[VideoThumbnail] Loaded metadata for', file.filename, 'duration:', video.duration);
+              const thumbnailTime = Math.min(video.duration * 0.1, 5);
+              video.currentTime = thumbnailTime;
+              resolve();
+            }, { once: true });
+
+            video.addEventListener('error', (e) => {
+              console.warn('[VideoThumbnail] Video error for', file.filename, e);
+              resolve();
+            }, { once: true });
+            setTimeout(resolve, 3000); // Timeout
+          });
+
+          // Wait for seek
+          await new Promise((resolve) => {
+            video.addEventListener('seeked', () => {
+              console.log('[VideoThumbnail] Seeked for', file.filename);
+              resolve();
+            }, { once: true });
+            video.addEventListener('error', (e) => {
+              console.warn('[VideoThumbnail] Seek error for', file.filename, e);
+              resolve();
+            }, { once: true });
+            setTimeout(resolve, 3000); // Timeout
+          });
+
+          // Create canvas and extract frame
+          const canvas = document.createElement('canvas');
+          canvas.width = 320;
+          canvas.height = 180;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          console.log('[VideoThumbnail] Generated thumbnail for', file.filename, 'length:', dataUrl.length);
+          thumbnails[file.id || file.filename] = dataUrl;
+        } catch (error) {
+          console.warn('[VideoThumbnail] Failed to generate thumbnail for', file.filename, error);
+        }
+      }
+
+      console.log('[VideoThumbnail] Generated thumbnails count:', Object.keys(thumbnails).length);
+      if (Object.keys(thumbnails).length > 0) {
+        setVideoThumbnails(prev => {
+          const updated = { ...prev, ...thumbnails };
+          console.log('[VideoThumbnail] Updated videoThumbnails state, total:', Object.keys(updated).length);
+          return updated;
+        });
+      }
+    };
+
+    if (files.length > 0) {
+      generateVideoThumbnails();
+    }
+  }, [files, getVideoStreamingUrl]);
 
   // Save view preference to localStorage
   useEffect(() => {
@@ -597,6 +684,13 @@ function FileBrowser() {
   // Get preview URL with auth token
   const getPreviewUrl = async (file) => {
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+    // For videos, don't download - let VideoPlayer handle streaming
+    if (file.mimetype?.includes('video')) {
+      return null; // VideoPlayer will use streaming directly
+    }
+
+    // For images, create blob URL for preview
     try {
       const response = await fetch(`${API_BASE}/api/download/${encodeURIComponent(file.filename)}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -1038,6 +1132,7 @@ function FileBrowser() {
             const IconComponent = fileIcon.icon;
             const previewable = isPreviewable(file);
             const isImage = file.mimetype?.includes('image');
+            const isVideo = file.mimetype?.includes('video');
 
             return (
               <div
@@ -1064,6 +1159,29 @@ function FileBrowser() {
                         {/* Preview indicator */}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                           <FiZoomIn className="text-white text-xl" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </div>
+                ) : isVideo ? (
+                  <div className="w-full h-32 mt-2 px-2 relative overflow-hidden rounded-lg bg-slate-900/50">
+                    {videoThumbnails[file.id || file.filename] ? (
+                      <>
+                        <img
+                          src={videoThumbnails[file.id || file.filename]}
+                          alt={file.originalname || file.filename}
+                          className="w-full h-full object-cover rounded-lg group-hover:scale-110 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                        {/* Play icon overlay */}
+                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors flex items-center justify-center">
+                          <div className="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <FiPlay className="text-slate-900 text-lg ml-0.5" />
+                          </div>
                         </div>
                       </>
                     ) : (
@@ -1178,6 +1296,9 @@ function FileBrowser() {
                 const fileIcon = getFileIcon(file.mimetype, file.filename);
                 const IconComponent = fileIcon.icon;
                 const previewable = isPreviewable(file);
+                const isVideo = file.mimetype?.includes('video');
+                const isImage = file.mimetype?.includes('image');
+
                 return (
                   <tr
                     key={file.id || file.filename}
@@ -1193,8 +1314,31 @@ function FileBrowser() {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 ${fileIcon.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                          <IconComponent className={`${fileIcon.color} text-lg`} />
+                        <div className="relative">
+                          {isVideo && videoThumbnails[file.id || file.filename] ? (
+                            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 relative">
+                              <img
+                                src={videoThumbnails[file.id || file.filename]}
+                                alt={file.originalname || file.filename}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                <FiPlay className="text-white text-xs" />
+                              </div>
+                            </div>
+                          ) : isImage && thumbnailUrls[file.id || file.filename] ? (
+                            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 relative">
+                              <img
+                                src={thumbnailUrls[file.id || file.filename]}
+                                alt={file.originalname || file.filename}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className={`w-10 h-10 ${fileIcon.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                              <IconComponent className={`${fileIcon.color} text-lg`} />
+                            </div>
+                          )}
                         </div>
                         <div className="min-w-0 max-w-full">
                           <div className="text-sm text-slate-300 font-medium truncate max-w-full">

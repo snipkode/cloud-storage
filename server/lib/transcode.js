@@ -112,7 +112,10 @@ function transcode(inputPath, quality = '720p', callback) {
 
   const startTime = Date.now();
 
-  ffmpeg(inputPath, { timeout: 600 })
+  // Timeout set to 5 minutes (300000ms) for typical videos, can be increased via env
+  const timeoutMs = parseInt(process.env.TRANSCODE_TIMEOUT, 10) || 300000;
+
+  ffmpeg(inputPath, { timeout: timeoutMs })
     .videoCodec('libx264')
     .audioCodec('aac')
     .videoBitrate(preset.videoBitrate)
