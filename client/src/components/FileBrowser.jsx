@@ -1766,29 +1766,29 @@ function FileBrowser() {
               />
             ) : previewFiles[previewIndex].mimetype?.includes('audio') ? (
               /* Audio Preview */
-              <div className="w-full max-w-md">
-                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-white/10 shadow-2xl">
-                  {/* Album art placeholder */}
-                  <div className="w-32 h-32 mx-auto mb-4 bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-pink-500/20 rounded-xl flex items-center justify-center border border-white/10">
-                    <FiMusic className="text-6xl text-amber-400" />
+              <div className="w-full max-w-sm">
+                <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-5 border border-white/10 shadow-2xl">
+                  {/* Album art */}
+                  <div className="w-24 h-24 mx-auto mb-3 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
+                    <FiMusic className="text-5xl text-white" />
                   </div>
                   
                   {/* File info */}
                   <div className="text-center mb-4">
-                    <h3 className="text-white font-semibold text-base truncate">
-                      {previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
+                    <h3 className="text-white font-semibold text-sm truncate" title={previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}>
+                      {(previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename).split('.').slice(0, -1).join('.') || 'Unknown'}
                     </h3>
-                    <p className="text-slate-400 text-xs mt-1">
-                      {formatSize(previewFiles[previewIndex].size)}
-                    </p>
+                    <p className="text-slate-500 text-xs mt-0.5 uppercase">{(previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename).split('.').pop() || 'Audio'}</p>
+                    <p className="text-slate-600 text-[10px] mt-1">{formatSize(previewFiles[previewIndex].size)}</p>
                   </div>
                   
-                  {/* Audio player */}
+                  {/* Audio player - compact */}
                   <audio
                     key={previewUrl || 'audio'}
                     src={previewUrl || ''}
                     controls
-                    className="w-full rounded-lg"
+                    className="w-full h-8 rounded-md"
+                    style={{ '--media-control-background': '#1e293b', '--media-button-color': '#818cf8' }}
                   >
                     Your browser does not support the audio element.
                   </audio>
@@ -1796,9 +1796,9 @@ function FileBrowser() {
                   {/* Download button */}
                   <button
                     onClick={() => handleDownload(previewFiles[previewIndex])}
-                    className="w-full mt-3 px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-400 hover:text-indigo-300 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
+                    className="w-full mt-3 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 hover:text-indigo-300 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5"
                   >
-                    <FiDownload className="text-sm" />
+                    <FiDownload className="text-xs" />
                     Download
                   </button>
                 </div>
