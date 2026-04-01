@@ -9,6 +9,7 @@ export const useFilesStore = create((set, get) => ({
   folders: [],
   loading: false,
   uploadProgress: 0,
+  uploadStatus: null, // { total, uploaded, currentFile, percent }
   error: null,
   stats: null,
   environment: 'live',
@@ -211,13 +212,23 @@ export const useFilesStore = create((set, get) => ({
         headers,
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
-            set({ uploadProgress: (progressEvent.loaded / progressEvent.total) * 100 });
+            const percent = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+            set({ 
+              uploadProgress: percent,
+              uploadStatus: {
+                total: files.length,
+                uploaded: 1,
+                currentFile: files[files.length - 1]?.name || 'Uploading...',
+                percent
+              }
+            });
           }
         }
       });
 
       if (response.status === 201) {
         await get().fetchFiles(token, environment);
+        set({ uploadProgress: 100, uploadStatus: null });
         return { success: true };
       } else {
         set({ error: response.data?.error || 'Upload failed' });

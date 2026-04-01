@@ -92,7 +92,7 @@ const formatRelativeTime = (date) => {
 
 function FileBrowser() {
   const { token } = useAuthStore();
-  const { files, folders, loading, uploadProgress, error, fetchFiles, fetchFolders, uploadMultiple, deleteFile, deleteFolder, createFolder, downloadFile, clearError, environment } = useFilesStore();
+  const { files, folders, loading, uploadProgress, uploadStatus, error, fetchFiles, fetchFolders, uploadMultiple, deleteFile, deleteFolder, createFolder, downloadFile, clearError, environment } = useFilesStore();
 
   // View state
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('fileBrowserView') || 'grid');
@@ -125,6 +125,7 @@ function FileBrowser() {
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [showUploadToast, setShowUploadToast] = useState(false);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
@@ -557,10 +558,16 @@ function FileBrowser() {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length > 0) {
       setIsUploading(true);
+      setShowUploadToast(true);
+      setUploadModalOpen(false); // Always close modal immediately (Google Drive style)
+      
       try {
         // Upload to current folder if inside one
         const folderPath = currentFolder?.path || null;
         await uploadMultiple(selectedFiles, token, currentEnvironment, folderPath);
+        
+        // Hide toast after upload completes
+        setTimeout(() => setShowUploadToast(false), 3000);
       } catch (err) {
         console.error('Upload failed:', err);
       } finally {
@@ -568,7 +575,6 @@ function FileBrowser() {
       }
     }
     e.target.value = '';
-    setUploadModalOpen(false);
   };
 
   // Handle delete single item
@@ -910,22 +916,54 @@ function FileBrowser() {
         </div>
       </div>
 
-      {/* Upload Progress - Compact */}
-      {(loading || isUploading) && uploadProgress > 0 && (
-        <div className="mb-3 p-2 bg-indigo-500/5 border border-indigo-500/20 rounded-lg" role="status">
-          <div className="flex items-center gap-2">
-            <FiCloud className="text-indigo-400 text-xs animate-pulse" />
-            <div className="flex-1">
-              <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                <span>Uploading...</span>
-                <span className="font-medium text-indigo-400">{Math.round(uploadProgress)}%</span>
+      {/* Upload Progress Toast - Google Drive Style (bottom-right) */}
+      {showUploadToast && (
+        <div className="fixed bottom-4 right-4 z-[100] animate-slide-up">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl shadow-black/50 p-4 min-w-[320px] max-w-md">
+            <div className="flex items-start gap-3">
+              {/* Icon */}
+              <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                {uploadProgress >= 100 ? (
+                  <FiCheck className="text-white text-lg" />
+                ) : (
+                  <FiCloud className="text-white text-lg animate-pulse" />
+                )}
               </div>
-              <div className="h-1 bg-slate-800/50 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all"
-                  style={{ width: `${uploadProgress}%` }}
-                />
+              
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-sm">
+                  {uploadProgress >= 100 ? 'Upload complete!' : 'Uploading...'}
+                </p>
+                {uploadProgress < 100 && (
+                  <>
+                    <p className="text-slate-400 text-xs mt-0.5 truncate">
+                      {uploadStatus?.currentFile || 'Preparing upload...'}
+                    </p>
+                    {/* Progress bar */}
+                    <div className="mt-2 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-indigo-400 text-xs mt-1 font-medium">{Math.round(uploadProgress)}%</p>
+                  </>
+                )}
+                {uploadProgress >= 100 && (
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    {uploadStatus?.total || 1} file(s) uploaded successfully
+                  </p>
+                )}
               </div>
+              
+              {/* Close button */}
+              <button
+                onClick={() => setShowUploadToast(false)}
+                className="flex-shrink-0 p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+              >
+                <FiX className="text-sm" />
+              </button>
             </div>
           </div>
         </div>
@@ -1497,8 +1535,19 @@ function FileBrowser() {
                     if (droppedFiles.length > 0) {
                       // Upload to current folder if inside one
                       const folderPath = currentFolder?.path || null;
-                      uploadMultiple(droppedFiles, token, currentEnvironment, folderPath);
+                      
+                      // Google Drive style: close modal immediately, show toast
+                      setIsUploading(true);
+                      setShowUploadToast(true);
                       setUploadModalOpen(false);
+                      
+                      uploadMultiple(droppedFiles, token, currentEnvironment, folderPath)
+                        .then(() => {
+                          setTimeout(() => setShowUploadToast(false), 3000);
+                        })
+                        .finally(() => {
+                          setIsUploading(false);
+                        });
                     }
                   }}
                 >
