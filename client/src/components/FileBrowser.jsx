@@ -1765,7 +1765,7 @@ function FileBrowser() {
                 token={token}
               />
             ) : previewFiles[previewIndex].mimetype?.includes('audio') ? (
-              /* Audio Preview */}
+              /* Audio Preview */
               <div className="w-full max-w-md">
                 <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-white/10 shadow-2xl">
                   {/* Album art placeholder */}
