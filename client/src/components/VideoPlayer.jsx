@@ -79,6 +79,14 @@ export const VideoPlayer = ({
   useEffect(() => {
     if (src && enableStreaming && filename && apiBase && token) {
       fetchQualities();
+    } else if (enableStreaming) {
+      // Set default qualities if streaming enabled but no fetch
+      setAvailableQualities([
+        { quality: 'original', label: 'Original', available: true, cached: false },
+        { quality: '480p', label: '480p', available: true, cached: false },
+        { quality: '720p', label: '720p', available: true, cached: false },
+        { quality: '1080p', label: '1080p', available: true, cached: false }
+      ]);
     }
   }, [src, filename, apiBase, enableStreaming, token]);
 
@@ -135,9 +143,9 @@ export const VideoPlayer = ({
       console.log('[VideoPlayer] Fetching qualities:', { 
         url: `${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}/qualities`,
         hasToken: !!token,
-        tokenLength: token?.length 
+        tokenLength: token?.length
       });
-      
+
       const response = await fetch(`${apiBase}/api/stream/${encodeURIComponent(cleanFilename)}/qualities`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -145,30 +153,48 @@ export const VideoPlayer = ({
       });
 
       console.log('[VideoPlayer] Qualities response status:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         const qualities = [{ quality: 'original', label: 'Original', available: true }];
-        
+
         data.transcoded?.forEach((q) => {
           if (q.available) {
-            qualities.push({ 
-              quality: q.quality, 
+            qualities.push({
+              quality: q.quality,
               label: q.quality,
               available: true,
-              cached: q.cached
+              cached: q.cached // Track if already cached
             });
           }
         });
-        
+
         console.log('[VideoPlayer] Available qualities:', qualities);
         setAvailableQualities(qualities);
-        setIsTranscoding(qualities.length === 1); // Only original = still transcoding
+        // Show transcoding indicator only if nothing is cached yet
+        setIsTranscoding(qualities.length === 1 || !qualities.some(q => q.cached));
+      } else {
+        // Response not OK, set default qualities
+        console.warn('[VideoPlayer] Qualities fetch returned non-OK status, using defaults');
+        setDefaultQualities();
       }
     } catch (error) {
       console.warn('[VideoPlayer] Failed to fetch qualities:', error.message);
-      // Don't show error - fallback to regular streaming
+      // Set default qualities on error
+      setDefaultQualities();
     }
+  };
+
+  // Set default qualities for fallback
+  const setDefaultQualities = () => {
+    const defaults = [
+      { quality: 'original', label: 'Original', available: true, cached: false },
+      { quality: '480p', label: '480p', available: true, cached: false },
+      { quality: '720p', label: '720p', available: true, cached: false },
+      { quality: '1080p', label: '1080p', available: true, cached: false }
+    ];
+    setAvailableQualities(defaults);
+    setIsTranscoding(true);
   };
 
   // Get streaming URL (memoized, no longer regenerated on every render)
@@ -743,24 +769,29 @@ export const VideoPlayer = ({
           <div className="text-center">
             <div className="w-14 h-14 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4" />
             <p className="text-white/80 text-sm font-medium">Loading video...</p>
-            <p className="text-white/50 text-xs mt-1">{filename}</p>
+            <p className="text-white/50 text-xs mt-1">{filename?.split('/').pop()?.substring(0, 30) || 'video'}</p>
             {isTranscoding && (
               <p className="text-indigo-400 text-xs mt-2 flex items-center justify-center gap-1">
-                <FiCast className="animate-pulse" /> Transcoding...
+                <FiCast className="animate-spin" /> Transcoding...
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Default placeholder when no video loaded */}
-      {!src && (
+      {/* Dynamic placeholder based on state */}
+      {!src && !isLoading && !hasError && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 z-0">
-          <div className="text-center">
+          <div className="text-center px-6">
             <div className="w-24 h-24 bg-white/5 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
               <FiFilm className="text-5xl text-white/40" />
             </div>
-            <p className="text-white/60 text-sm font-medium">No video loaded</p>
+            <p className="text-white/60 text-sm font-medium">
+              {hasError ? 'Video Unavailable' : 'No Video Selected'}
+            </p>
+            {hasError && (
+              <p className="text-red-400/70 text-xs mt-1">Failed to load video</p>
+            )}
           </div>
         </div>
       )}
@@ -821,25 +852,26 @@ export const VideoPlayer = ({
 
           {/* Right controls - Quality, Download, Speed, Fullscreen */}
           <div className="flex items-center gap-0.5 relative flex-nowrap">
-            {/* Quality selector */}
-            {enableStreaming && availableQualities.length > 0 && (
+            {/* Quality selector - always show for video when streaming enabled */}
+            {enableStreaming && (
               <div className="relative">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowQualityMenu(!showQualityMenu);
                   }}
-                  className="w-8 h-8 flex items-center justify-center hover:bg-white/15 rounded-md transition-all active:scale-95 text-white text-xs font-medium gap-1 flex-nowrap"
+                  className={`w-8 h-8 flex items-center justify-center hover:bg-white/15 rounded-md transition-all active:scale-95 text-white text-xs font-medium flex-nowrap ${
+                    isTranscoding ? 'text-indigo-400' : ''
+                  }`}
                   title="Quality"
                 >
-                  <FiCast className="text-xs" />
-                  <span className="hidden sm:inline">{selectedQuality === 'auto' ? 'AUTO' : selectedQuality.toUpperCase()}</span>
+                  <FiCast className={`text-xs ${isTranscoding ? 'animate-spin' : ''}`} />
                 </button>
 
                 {/* Quality menu dropdown */}
                 {showQualityMenu && (
                   <div
-                    className="absolute bottom-full right-0 mb-2 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-lg py-1 min-w-[100px] z-50"
+                    className="absolute bottom-full right-0 mb-2 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-lg py-1 min-w-[120px] z-50"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
@@ -848,15 +880,15 @@ export const VideoPlayer = ({
                         setSelectedQuality('auto');
                         setShowQualityMenu(false);
                       }}
-                      className={`w-full px-3 py-2 text-left text-xs hover:bg-white/10 transition-colors flex items-center justify-between ${
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-white/10 transition-colors flex items-center justify-between whitespace-nowrap ${
                         selectedQuality === 'auto' ? 'text-indigo-400' : 'text-white'
                       }`}
                     >
-                      Auto
+                      <span>Auto</span>
                       {selectedQuality === 'auto' && <span className="text-indigo-400">✓</span>}
                     </button>
 
-                    {availableQualities.map((q) => (
+                    {availableQualities.length > 0 ? availableQualities.map((q) => (
                       <button
                         key={q.quality}
                         onClick={(e) => {
@@ -864,21 +896,49 @@ export const VideoPlayer = ({
                           setSelectedQuality(q.quality);
                           setShowQualityMenu(false);
                         }}
-                        className={`w-full px-3 py-2 text-left text-xs hover:bg-white/10 transition-colors flex items-center justify-between ${
+                        className={`w-full px-3 py-2 text-left text-xs hover:bg-white/10 transition-colors flex items-center justify-between whitespace-nowrap ${
                           selectedQuality === q.quality ? 'text-indigo-400' : 'text-white'
                         }`}
                       >
-                        {q.label}
+                        <span className="flex items-center gap-2">
+                          {q.label}
+                          {q.cached && (
+                            <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-1 rounded">
+                              ✓
+                            </span>
+                          )}
+                        </span>
                         {selectedQuality === q.quality && <span className="text-indigo-400">✓</span>}
                       </button>
-                    ))}
-
-                    {isTranscoding && (
-                      <div className="px-3 py-2 text-xs text-slate-400 border-t border-white/10 mt-1 pt-2">
-                        <FiCast className="inline animate-spin mr-1" />
-                        Transcoding...
-                      </div>
+                    )) : (
+                      // Default qualities if not fetched
+                      ['original', '480p', '720p', '1080p'].map((q) => (
+                        <button
+                          key={q}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedQuality(q);
+                            setShowQualityMenu(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left text-xs hover:bg-white/10 transition-colors flex items-center justify-between whitespace-nowrap ${
+                            selectedQuality === q ? 'text-indigo-400' : 'text-white'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            {q === 'original' ? 'Original' : q}
+                            <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 rounded">
+                              ⚡
+                            </span>
+                          </span>
+                          {selectedQuality === q && <span className="text-indigo-400">✓</span>}
+                        </button>
+                      ))
                     )}
+
+                    <div className="px-3 py-2 text-xs text-slate-400 border-t border-white/10 mt-1 pt-2 flex items-center gap-1 whitespace-nowrap">
+                      <FiCast className={`text-xs ${isTranscoding ? 'animate-spin' : ''}`} />
+                      <span>{isTranscoding ? 'Transcoding...' : 'Ready'}</span>
+                    </div>
                   </div>
                 )}
               </div>

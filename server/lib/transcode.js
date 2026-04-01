@@ -18,23 +18,27 @@ const TRANSCODE_CONFIG = {
 };
 
 // Quality presets for ffmpeg
+// Use -2 for width/height to maintain aspect ratio (auto-calculate)
 const QUALITY_PRESETS = {
-  '480p': { 
-    videoBitrate: '800k', 
-    audioBitrate: '128k', 
-    resolution: '854x480',
+  '480p': {
+    videoBitrate: '800k',
+    audioBitrate: '128k',
+    // Scale to 480px height, width auto-calculated to maintain aspect ratio
+    scaleHeight: 480,
     profile: 'main'
   },
-  '720p': { 
-    videoBitrate: '2500k', 
-    audioBitrate: '192k', 
-    resolution: '1280x720',
+  '720p': {
+    videoBitrate: '2500k',
+    audioBitrate: '192k',
+    // Scale to 720px height, width auto-calculated to maintain aspect ratio
+    scaleHeight: 720,
     profile: 'main'
   },
-  '1080p': { 
-    videoBitrate: '5000k', 
-    audioBitrate: '256k', 
-    resolution: '1920x1080',
+  '1080p': {
+    videoBitrate: '5000k',
+    audioBitrate: '256k',
+    // Scale to 1080px height, width auto-calculated to maintain aspect ratio
+    scaleHeight: 1080,
     profile: 'high'
   }
 };
@@ -115,12 +119,71 @@ function transcode(inputPath, quality = '720p', callback) {
   // Timeout set to 5 minutes (300000ms) for typical videos, can be increased via env
   const timeoutMs = parseInt(process.env.TRANSCODE_TIMEOUT, 10) || 300000;
 
-  ffmpeg(inputPath, { timeout: timeoutMs })
+  // First, get video metadata to determine orientation
+  ffmpeg.ffprobe(inputPath, (err, metadata) => {
+    if (err) {
+      logger.error(`[Transcode] Failed to get metadata: ${err.message}`);
+      // Continue with default landscape scaling
+      return startTranscode(inputPath, preset, outputPath, startTime, timeoutMs, callback, false);
+    }
+
+    const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+    if (!videoStream) {
+      logger.error('[Transcode] No video stream found');
+      return callback(new Error('No video stream found'), null);
+    }
+
+    const width = videoStream.width;
+    const height = videoStream.height;
+    const isPortrait = height > width;
+
+    logger.debug(`[Transcode] Video dimensions: ${width}x${height}, isPortrait: ${isPortrait}`);
+
+    startTranscode(inputPath, preset, outputPath, startTime, timeoutMs, callback, isPortrait, width, height);
+  });
+}
+
+/**
+ * Start transcoding with appropriate scale filter
+ */
+function startTranscode(inputPath, preset, outputPath, startTime, timeoutMs, callback, isPortrait = false, originalWidth, originalHeight) {
+  const ffmpegCommand = ffmpeg(inputPath, { timeout: timeoutMs })
     .videoCodec('libx264')
     .audioCodec('aac')
     .videoBitrate(preset.videoBitrate)
-    .audioBitrate(preset.audioBitrate)
-    .size(preset.resolution)
+    .audioBitrate(preset.audioBitrate);
+
+  // Use scale filter to maintain aspect ratio
+  // For landscape: scale by height (e.g., 1280x720)
+  // For portrait: scale by width (e.g., 720x1280)
+  // -2 means auto-calculate to maintain aspect ratio, divisible by 2 for compatibility
+  if (isPortrait) {
+    // Portrait video: scale by width instead
+    ffmpegCommand.videoFilters([
+      {
+        filter: 'scale',
+        options: {
+          w: preset.scaleHeight, // Use height preset as width for portrait
+          h: `-2`
+        }
+      }
+    ]);
+    logger.debug(`[Transcode] Scaling portrait video to ${preset.scaleHeight}x-2`);
+  } else {
+    // Landscape video: scale by height (default)
+    ffmpegCommand.videoFilters([
+      {
+        filter: 'scale',
+        options: {
+          w: `-2`,
+          h: preset.scaleHeight
+        }
+      }
+    ]);
+    logger.debug(`[Transcode] Scaling landscape video to -2x${preset.scaleHeight}`);
+  }
+
+  ffmpegCommand
     .outputOptions([
       '-preset medium',
       '-crf 23',
