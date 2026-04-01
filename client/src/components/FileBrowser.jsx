@@ -661,14 +661,16 @@ function FileBrowser() {
     }
   };
 
-  // Check if file is previewable (image, PDF, or video)
+  // Check if file is previewable (image, PDF, video, or audio)
   const isPreviewable = (file) => {
     const mime = file.mimetype?.toLowerCase() || '';
     const ext = (file.originalname || file.filename || '').toLowerCase();
-    return mime.includes('image') || mime.includes('pdf') || mime.includes('video') ||
+    return mime.includes('image') || mime.includes('pdf') || mime.includes('video') || mime.includes('audio') ||
            ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png') ||
            ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.pdf') ||
-           ext.endsWith('.mp4') || ext.endsWith('.webm') || ext.endsWith('.ogg') || ext.endsWith('.mov');
+           ext.endsWith('.mp4') || ext.endsWith('.webm') || ext.endsWith('.ogg') || ext.endsWith('.mov') ||
+           ext.endsWith('.mp3') || ext.endsWith('.wav') || ext.endsWith('.ogg') || ext.endsWith('.flac') ||
+           ext.endsWith('.aac') || ext.endsWith('.m4a') || ext.endsWith('.wma') || ext.endsWith('.aiff');
   };
 
   // Get previewable files from current view
@@ -1742,7 +1744,7 @@ function FileBrowser() {
           </div>
 
           {/* Preview content */}
-          <div className={`flex-1 flex items-center justify-center p-4 overflow-visible ${!previewFiles[previewIndex]?.mimetype?.includes('video') && !previewFiles[previewIndex]?.mimetype?.includes('pdf') ? 'pb-24' : ''}`} onClick={(e) => e.stopPropagation()}>
+          <div className={`flex-1 flex items-center justify-center p-4 overflow-visible ${!previewFiles[previewIndex]?.mimetype?.includes('video') && !previewFiles[previewIndex]?.mimetype?.includes('pdf') && !previewFiles[previewIndex]?.mimetype?.includes('audio') ? 'pb-24' : ''}`} onClick={(e) => e.stopPropagation()}>
             {previewFiles[previewIndex].mimetype?.includes('pdf') ? (
               /* PDF Preview */
               <div className="w-full h-full max-w-4xl">
@@ -1762,6 +1764,45 @@ function FileBrowser() {
                 apiBase={import.meta.env.VITE_API_URL || 'http://localhost:3000'}
                 token={token}
               />
+            ) : previewFiles[previewIndex].mimetype?.includes('audio') ? (
+              /* Audio Preview */}
+              <div className="w-full max-w-md">
+                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-white/10 shadow-2xl">
+                  {/* Album art placeholder */}
+                  <div className="w-32 h-32 mx-auto mb-4 bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-pink-500/20 rounded-xl flex items-center justify-center border border-white/10">
+                    <FiMusic className="text-6xl text-amber-400" />
+                  </div>
+                  
+                  {/* File info */}
+                  <div className="text-center mb-4">
+                    <h3 className="text-white font-semibold text-base truncate">
+                      {previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
+                    </h3>
+                    <p className="text-slate-400 text-xs mt-1">
+                      {formatSize(previewFiles[previewIndex].size)}
+                    </p>
+                  </div>
+                  
+                  {/* Audio player */}
+                  <audio
+                    key={previewUrl || 'audio'}
+                    src={previewUrl || ''}
+                    controls
+                    className="w-full rounded-lg"
+                  >
+                    Your browser does not support the audio element.
+                  </audio>
+                  
+                  {/* Download button */}
+                  <button
+                    onClick={() => handleDownload(previewFiles[previewIndex])}
+                    className="w-full mt-3 px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-400 hover:text-indigo-300 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
+                  >
+                    <FiDownload className="text-sm" />
+                    Download
+                  </button>
+                </div>
+              </div>
             ) : previewLoading ? (
               /* Loading state */
               <div className="flex flex-col items-center gap-4">
@@ -1785,8 +1826,8 @@ function FileBrowser() {
             )}
           </div>
 
-          {/* File info - hide for video since it has its own overlay */}
-          {!previewFiles[previewIndex]?.mimetype?.includes('video') && (
+          {/* File info - hide for video and audio since they have their own overlay */}
+          {!previewFiles[previewIndex]?.mimetype?.includes('video') && !previewFiles[previewIndex]?.mimetype?.includes('audio') && (
             <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-center z-[210]">
               <p className="text-white font-medium text-sm mb-1">
                 {previewFiles[previewIndex].originalname || previewFiles[previewIndex].filename}
