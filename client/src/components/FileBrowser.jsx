@@ -359,13 +359,13 @@ function FileBrowser() {
     const ext = filename?.toLowerCase() || '';
     const mime = mimetype?.toLowerCase() || '';
 
-    if (mime.includes('image') || ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png') || ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.bmp') || ext.endsWith('.svg')) return 'photo';
-    if (mime.includes('video') || ext.endsWith('.mp4') || ext.endsWith('.avi') || ext.endsWith('.mov') || ext.endsWith('.mkv') || ext.endsWith('.webm') || ext.endsWith('.flv') || ext.endsWith('.wmv')) return 'video';
-    if (mime.includes('audio') || ext.endsWith('.mp3') || ext.endsWith('.wav') || ext.endsWith('.ogg') || ext.endsWith('.flac') || ext.endsWith('.aac') || ext.endsWith('.m4a')) return 'audio';
+    if (mime.includes('image') || ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.png') || ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.bmp') || ext.endsWith('.svg') || ext.endsWith('.heic') || ext.endsWith('.raw')) return 'photo';
+    if (mime.includes('video') || ext.endsWith('.mp4') || ext.endsWith('.avi') || ext.endsWith('.mov') || ext.endsWith('.mkv') || ext.endsWith('.webm') || ext.endsWith('.flv') || ext.endsWith('.wmv') || ext.endsWith('.m4v')) return 'video';
+    if (mime.includes('audio') || ext.endsWith('.mp3') || ext.endsWith('.wav') || ext.endsWith('.ogg') || ext.endsWith('.flac') || ext.endsWith('.aac') || ext.endsWith('.m4a') || ext.endsWith('.wma') || ext.endsWith('.aiff') || ext.endsWith('.alac') || ext.endsWith('.opus') || ext.endsWith('.mka')) return 'audio';
     if (mime.includes('pdf') || ext.endsWith('.pdf')) return 'pdf';
     if (mime.includes('word') || ext.endsWith('.doc') || ext.endsWith('.docx')) return 'docs';
-    if (mime.includes('excel') || ext.endsWith('.xls') || ext.endsWith('.xlsx')) return 'excel';
-    if (mime.includes('text') || ext.endsWith('.txt')) return 'txt';
+    if (mime.includes('excel') || ext.endsWith('.xls') || ext.endsWith('.xlsx') || ext.endsWith('.csv')) return 'excel';
+    if (mime.includes('text') || ext.endsWith('.txt') || ext.endsWith('.md') || ext.endsWith('.rtf')) return 'txt';
     return 'other';
   };
 
