@@ -261,6 +261,183 @@ function SystemLogsModal({ isOpen, onClose }) {
   );
 }
 
+// Cloud Settings Modal
+function CloudSettingsModal({ isOpen, onClose }) {
+  const [settings, setSettings] = useState({
+    uploadLimit: 50, // MB
+    downloadLimit: 100, // MB per day
+    enableTranscoding: true,
+    defaultQuality: '720p'
+  });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Load current settings from localStorage (or API in production)
+      const saved = localStorage.getItem('cloudSettings');
+      if (saved) {
+        try {
+          setSettings(JSON.parse(saved));
+        } catch (e) {
+          console.error('Failed to load settings:', e);
+        }
+      }
+    }
+  }, [isOpen]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage(null);
+    
+    // In production, this would call an API endpoint
+    // await fetch('/api/admin/settings', { method: 'POST', body: JSON.stringify(settings) })
+    
+    localStorage.setItem('cloudSettings', JSON.stringify(settings));
+    
+    setTimeout(() => {
+      setSaving(false);
+      setMessage({ type: 'success', text: 'Settings saved successfully!' });
+      setTimeout(() => setMessage(null), 3000);
+    }, 500);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl">
+        {/* Header */}
+        <div className="p-4 border-b border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
+              <FiSettings className="text-white text-lg" />
+            </div>
+            <div>
+              <h3 className="text-white font-semibold text-base">Cloud Settings</h3>
+              <p className="text-xs text-slate-500">Storage & bandwidth limits</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-all">
+            <FiX className="text-xl" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 space-y-4">
+          {/* Upload Limit */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              Upload Size Limit (MB)
+            </label>
+            <input
+              type="number"
+              value={settings.uploadLimit}
+              onChange={(e) => setSettings({ ...settings, uploadLimit: parseInt(e.target.value) || 0 })}
+              className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
+              min="1"
+              max="1000"
+            />
+            <p className="text-xs text-slate-500 mt-1">Maximum file size per upload</p>
+          </div>
+
+          {/* Download Limit */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+              Download Limit (MB/day)
+            </label>
+            <input
+              type="number"
+              value={settings.downloadLimit}
+              onChange={(e) => setSettings({ ...settings, downloadLimit: parseInt(e.target.value) || 0 })}
+              className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
+              min="10"
+              max="10000"
+            />
+            <p className="text-xs text-slate-500 mt-1">Daily download quota per user</p>
+          </div>
+
+          {/* Transcoding */}
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <label className="text-sm font-medium text-slate-300">Enable Transcoding</label>
+              <p className="text-xs text-slate-500 mt-0.5">Auto-transcode videos for streaming</p>
+            </div>
+            <button
+              onClick={() => setSettings({ ...settings, enableTranscoding: !settings.enableTranscoding })}
+              className={`w-11 h-6 rounded-full transition-colors ${
+                settings.enableTranscoding ? 'bg-blue-500' : 'bg-slate-700'
+              }`}
+            >
+              <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                settings.enableTranscoding ? 'translate-x-5' : 'translate-x-0.5'
+              }`} />
+            </button>
+          </div>
+
+          {/* Default Quality */}
+          {settings.enableTranscoding && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Default Transcode Quality
+              </label>
+              <select
+                value={settings.defaultQuality}
+                onChange={(e) => setSettings({ ...settings, defaultQuality: e.target.value })}
+                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
+              >
+                <option value="360p">360p (Low bandwidth)</option>
+                <option value="480p">480p (Minimum quality)</option>
+                <option value="720p">720p (Recommended)</option>
+                <option value="1080p">1080p (Full HD)</option>
+              </select>
+            </div>
+          )}
+
+          {/* Message */}
+          {message && (
+            <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${
+              message.type === 'success' 
+                ? 'bg-green-500/10 border border-green-500/30 text-green-400' 
+                : 'bg-red-500/10 border border-red-500/30 text-red-400'
+            }`}>
+              {message.type === 'success' ? <FiCheckCircle className="text-sm" /> : <FiAlertCircle className="text-sm" />}
+              {message.text}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-white/5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium rounded-lg hover:bg-white/5 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-5 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+          >
+            {saving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <FiCheckCircle className="text-sm" />
+                Save Settings
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Samba Integration Modal
 function SambaModal({ isOpen, onClose }) {
   const { sambaStatus, fetchSambaStatus } = useAdminStore();
@@ -358,6 +535,7 @@ function AdminDashboard() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
   const [showSambaModal, setShowSambaModal] = useState(false);
+  const [showCloudSettingsModal, setShowCloudSettingsModal] = useState(false);
 
   // Check if user is admin or super_admin
   const isAdmin = user?.role === 'admin';
@@ -510,6 +688,16 @@ function AdminDashboard() {
               </button>
             )}
             <button
+              onClick={() => setShowCloudSettingsModal(true)}
+              className="p-3 bg-slate-700/30 hover:bg-blue-500/10 border border-white/5 hover:border-blue-500/30 rounded-lg transition-all group text-left"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <FiSettings className="text-blue-400 group-hover:scale-110 transition-transform" />
+                <span className="text-white text-sm font-medium">Cloud</span>
+              </div>
+              <p className="text-xs text-slate-500">Storage limits</p>
+            </button>
+            <button
               onClick={() => setShowSambaModal(true)}
               className="p-3 bg-slate-700/30 hover:bg-purple-500/10 border border-white/5 hover:border-purple-500/30 rounded-lg transition-all group text-left"
             >
@@ -584,6 +772,7 @@ function AdminDashboard() {
       {showUserModal && isSuperAdmin && (
         <UserManagementModal isOpen={showUserModal} onClose={() => setShowUserModal(false)} />
       )}
+      <CloudSettingsModal isOpen={showCloudSettingsModal} onClose={() => setShowCloudSettingsModal(false)} />
       <SystemLogsModal isOpen={showLogsModal} onClose={() => setShowLogsModal(false)} />
       <SambaModal isOpen={showSambaModal} onClose={() => setShowSambaModal(false)} />
       </div>
