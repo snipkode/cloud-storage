@@ -497,8 +497,17 @@ router.get('/files',
       cleanup: deletedCount.count > 0 ? { deleted: deletedCount.count } : undefined
     });
   } catch (error) {
-    logger.error('List files error:', error.message);
-    res.status(500).json({ error: 'Failed to list files' });
+    logger.error('[List Files] Error:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+      details: error.details
+    });
+    res.status(500).json({ 
+      error: 'Failed to list files',
+      details: error.message,
+      code: error.code
+    });
   }
 });
 
@@ -968,14 +977,15 @@ router.get('/stream/:filename/qualities',
       return res.status(404).json({ error: 'File not found' });
     }
 
-    // Check which qualities are available
-    const availableQualities = ['original'];
-    const qualities = ['480p', '720p', '1080p'];
+    // All quality options
+    const qualities = ['360p', '480p', '720p', '1080p'];
 
+    // Check which qualities are already cached
+    const cachedQualities = [];
     if (transcodeLib.TRANSCODE_CONFIG.enabled) {
       qualities.forEach((q) => {
         if (transcodeLib.hasCache(filePath, q)) {
-          availableQualities.push(q);
+          cachedQualities.push(q);
         }
       });
     }
@@ -1003,8 +1013,8 @@ router.get('/stream/:filename/qualities',
       },
       transcoded: qualities.map((q) => ({
         quality: q,
-        available: availableQualities.includes(q),
-        cached: transcodeLib.hasCache(filePath, q)
+        available: transcodeLib.TRANSCODE_CONFIG.enabled, // Show all qualities if transcoding is enabled
+        cached: cachedQualities.includes(q)
       })),
       transcodingEnabled: transcodeLib.TRANSCODE_CONFIG.enabled
     });
@@ -1236,7 +1246,19 @@ router.get('/folders',
       env = baseEnv;
     }
 
-    const folders = await fileMetadataStore.getUserFolders(req.user.uid, env);
+    let folders = [];
+    try {
+      folders = await fileMetadataStore.getUserFolders(req.user.uid, env);
+      logger.debug(`[Folders] Retrieved ${folders.length} folders for user ${req.user.uid}`);
+    } catch (firestoreError) {
+      logger.error('[Folders] Firestore query failed:', firestoreError.message);
+      // Return empty folders array instead of 500
+      return res.json({
+        folders: [],
+        total: 0,
+        environment: env
+      });
+    }
 
     res.json({
       folders: folders.map(f => ({
@@ -1251,8 +1273,15 @@ router.get('/folders',
       environment: env
     });
   } catch (error) {
-    logger.error('List folders error:', error.message);
-    res.status(500).json({ error: 'Failed to list folders' });
+    logger.error('List folders error:', error.message, {
+      stack: error.stack,
+      uid: req.user?.uid
+    });
+    res.status(500).json({ 
+      error: 'Failed to list folders',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

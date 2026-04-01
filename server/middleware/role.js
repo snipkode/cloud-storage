@@ -19,7 +19,7 @@ const getUserRole = async (userId) => {
     // If user document doesn't exist, return default role
     return 'user';
   } catch (error) {
-    logger.error('Error getting user role:', error.message);
+    // Silently fail and return default role to avoid spamming logs
     return 'user';
   }
 };

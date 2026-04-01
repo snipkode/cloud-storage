@@ -36,6 +36,9 @@ Thumbs.db
 server/uploads/
 server/test-uploads/
 
+# Transcode cache (generated files)
+server/transcode-cache/
+
 # AI Assistant
 .qwen/
 

@@ -83,6 +83,7 @@ export const VideoPlayer = ({
       // Set default qualities if streaming enabled but no fetch
       setAvailableQualities([
         { quality: 'original', label: 'Original', available: true, cached: false },
+        { quality: '360p', label: '360p', available: true, cached: false },
         { quality: '480p', label: '480p', available: true, cached: false },
         { quality: '720p', label: '720p', available: true, cached: false },
         { quality: '1080p', label: '1080p', available: true, cached: false }
@@ -189,6 +190,7 @@ export const VideoPlayer = ({
   const setDefaultQualities = () => {
     const defaults = [
       { quality: 'original', label: 'Original', available: true, cached: false },
+      { quality: '360p', label: '360p', available: true, cached: false },
       { quality: '480p', label: '480p', available: true, cached: false },
       { quality: '720p', label: '720p', available: true, cached: false },
       { quality: '1080p', label: '1080p', available: true, cached: false }
@@ -912,7 +914,7 @@ export const VideoPlayer = ({
                       </button>
                     )) : (
                       // Default qualities if not fetched
-                      ['original', '480p', '720p', '1080p'].map((q) => (
+                      ['original', '360p', '480p', '720p', '1080p'].map((q) => (
                         <button
                           key={q}
                           onClick={(e) => {

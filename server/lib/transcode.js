@@ -20,6 +20,13 @@ const TRANSCODE_CONFIG = {
 // Quality presets for ffmpeg
 // Use -2 for width/height to maintain aspect ratio (auto-calculate)
 const QUALITY_PRESETS = {
+  '360p': {
+    videoBitrate: '500k',
+    audioBitrate: '96k',
+    // Scale to 360px height, width auto-calculated to maintain aspect ratio
+    scaleHeight: 360,
+    profile: 'baseline'
+  },
   '480p': {
     videoBitrate: '800k',
     audioBitrate: '128k',

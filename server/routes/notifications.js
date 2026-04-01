@@ -32,10 +32,19 @@ router.get('/',
     try {
       const limit = parseInt(req.query.limit) || 50;
       logger.debug(`[Notifications] Getting notifications for user: ${req.user.uid}, limit: ${limit}`);
-      
-      const notifications = await notificationStore.getUserNotifications(req.user.uid, limit);
 
-      logger.debug(`[Notifications] Found ${notifications.length} notifications`);
+      let notifications = [];
+      try {
+        notifications = await notificationStore.getUserNotifications(req.user.uid, limit);
+        logger.debug(`[Notifications] Found ${notifications.length} notifications`);
+      } catch (firestoreError) {
+        logger.error('[Notifications] Firestore query failed:', firestoreError.message);
+        // Return empty notifications array instead of 500
+        return res.json({
+          notifications: [],
+          total: 0
+        });
+      }
 
       res.json({
         notifications,
@@ -43,9 +52,9 @@ router.get('/',
       });
     } catch (error) {
       logger.error('Get notifications error:', error.message, error.stack);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to get notifications',
-        details: error.message 
+        details: error.message
       });
     }
   }
@@ -60,7 +69,14 @@ router.get('/unread-count',
   requirePermission('read'),
   async (req, res) => {
     try {
-      const count = await notificationStore.getUnreadCount(req.user.uid);
+      let count = 0;
+      try {
+        count = await notificationStore.getUnreadCount(req.user.uid);
+      } catch (firestoreError) {
+        logger.error('[Unread Count] Firestore query failed:', firestoreError.message);
+        // Return 0 instead of 500
+        count = 0;
+      }
 
       res.json({
         unreadCount: count
