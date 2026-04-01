@@ -302,6 +302,7 @@ function SystemLogsModal({ isOpen, onClose }) {
 
 // Cloud Settings Modal
 function CloudSettingsModal({ isOpen, onClose }) {
+  const { token } = useAuthStore();
   const [settings, setSettings] = useState({
     uploadLimit: 50, // MB
     downloadLimit: 100, // MB per day
@@ -310,35 +311,64 @@ function CloudSettingsModal({ isOpen, onClose }) {
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   useEffect(() => {
     if (isOpen) {
-      // Load current settings from localStorage (or API in production)
-      const saved = localStorage.getItem('cloudSettings');
-      if (saved) {
-        try {
-          setSettings(JSON.parse(saved));
-        } catch (e) {
-          console.error('Failed to load settings:', e);
-        }
-      }
+      fetchSettings();
     }
   }, [isOpen]);
+
+  const fetchSettings = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/settings`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSettings(data.settings);
+      } else {
+        // Fallback to defaults
+        console.warn('Failed to load settings, using defaults');
+      }
+    } catch (error) {
+      console.error('Failed to fetch settings:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
     setMessage(null);
     
-    // In production, this would call an API endpoint
-    // await fetch('/api/admin/settings', { method: 'POST', body: JSON.stringify(settings) })
-    
-    localStorage.setItem('cloudSettings', JSON.stringify(settings));
-    
-    setTimeout(() => {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/settings`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(settings)
+      });
+      
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMessage({ type: 'success', text: 'Settings saved successfully!' });
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to save settings' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to save settings' });
+      console.error('Save settings error:', error.message);
+    } finally {
       setSaving(false);
-      setMessage({ type: 'success', text: 'Settings saved successfully!' });
-      setTimeout(() => setMessage(null), 3000);
-    }, 500);
+    }
   };
 
   if (!isOpen) return null;
@@ -364,73 +394,82 @@ function CloudSettingsModal({ isOpen, onClose }) {
 
         {/* Content */}
         <div className="p-4 space-y-4">
-          {/* Upload Limit */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Upload Size Limit (MB)
-            </label>
-            <input
-              type="number"
-              value={settings.uploadLimit}
-              onChange={(e) => setSettings({ ...settings, uploadLimit: parseInt(e.target.value) || 0 })}
-              className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
-              min="1"
-              max="1000"
-            />
-            <p className="text-xs text-slate-500 mt-1">Maximum file size per upload</p>
-          </div>
-
-          {/* Download Limit */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Download Limit (MB/day)
-            </label>
-            <input
-              type="number"
-              value={settings.downloadLimit}
-              onChange={(e) => setSettings({ ...settings, downloadLimit: parseInt(e.target.value) || 0 })}
-              className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
-              min="10"
-              max="10000"
-            />
-            <p className="text-xs text-slate-500 mt-1">Daily download quota per user</p>
-          </div>
-
-          {/* Transcoding */}
-          <div className="flex items-center justify-between py-2">
-            <div>
-              <label className="text-sm font-medium text-slate-300">Enable Transcoding</label>
-              <p className="text-xs text-slate-500 mt-0.5">Auto-transcode videos for streaming</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-slate-400 text-sm ml-2">Loading settings...</span>
             </div>
-            <button
-              onClick={() => setSettings({ ...settings, enableTranscoding: !settings.enableTranscoding })}
-              className={`w-11 h-6 rounded-full transition-colors ${
-                settings.enableTranscoding ? 'bg-blue-500' : 'bg-slate-700'
-              }`}
-            >
-              <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                settings.enableTranscoding ? 'translate-x-5' : 'translate-x-0.5'
-              }`} />
-            </button>
-          </div>
+          ) : (
+            <>
+              {/* Upload Limit */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Upload Size Limit (MB)
+                </label>
+                <input
+                  type="number"
+                  value={settings.uploadLimit}
+                  onChange={(e) => setSettings({ ...settings, uploadLimit: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
+                  min="1"
+                  max="1000"
+                />
+                <p className="text-xs text-slate-500 mt-1">Maximum file size per upload</p>
+              </div>
 
-          {/* Default Quality */}
-          {settings.enableTranscoding && (
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                Default Transcode Quality
-              </label>
-              <select
-                value={settings.defaultQuality}
-                onChange={(e) => setSettings({ ...settings, defaultQuality: e.target.value })}
-                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
-              >
-                <option value="360p">360p (Low bandwidth)</option>
-                <option value="480p">480p (Minimum quality)</option>
-                <option value="720p">720p (Recommended)</option>
-                <option value="1080p">1080p (Full HD)</option>
-              </select>
-            </div>
+              {/* Download Limit */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Download Limit (MB/day)
+                </label>
+                <input
+                  type="number"
+                  value={settings.downloadLimit}
+                  onChange={(e) => setSettings({ ...settings, downloadLimit: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
+                  min="10"
+                  max="10000"
+                />
+                <p className="text-xs text-slate-500 mt-1">Daily download quota per user</p>
+              </div>
+
+              {/* Transcoding */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <label className="text-sm font-medium text-slate-300">Enable Transcoding</label>
+                  <p className="text-xs text-slate-500 mt-0.5">Auto-transcode videos for streaming</p>
+                </div>
+                <button
+                  onClick={() => setSettings({ ...settings, enableTranscoding: !settings.enableTranscoding })}
+                  className={`w-11 h-6 rounded-full transition-colors ${
+                    settings.enableTranscoding ? 'bg-blue-500' : 'bg-slate-700'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                    settings.enableTranscoding ? 'translate-x-5' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+
+              {/* Default Quality */}
+              {settings.enableTranscoding && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Default Transcode Quality
+                  </label>
+                  <select
+                    value={settings.defaultQuality}
+                    onChange={(e) => setSettings({ ...settings, defaultQuality: e.target.value })}
+                    className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 transition-all"
+                  >
+                    <option value="360p">360p (Low bandwidth)</option>
+                    <option value="480p">480p (Minimum quality)</option>
+                    <option value="720p">720p (Recommended)</option>
+                    <option value="1080p">1080p (Full HD)</option>
+                  </select>
+                </div>
+              )}
+            </>
           )}
 
           {/* Message */}
@@ -456,7 +495,7 @@ function CloudSettingsModal({ isOpen, onClose }) {
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || loading}
             className="px-5 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-all flex items-center gap-2"
           >
             {saving ? (
