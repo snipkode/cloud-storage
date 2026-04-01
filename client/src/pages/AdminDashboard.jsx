@@ -188,12 +188,21 @@ function UserManagementModal({ isOpen, onClose }) {
                     {/* Delete Button */}
                     <button
                       onClick={() => {
+                        if (isCurrentUser) {
+                          alert('You cannot delete your own account. Please ask another super admin to delete your account.');
+                          return;
+                        }
                         if (confirm('Delete this user? This will remove all their files and API keys.')) {
                           deleteUser(user.uid);
                         }
                       }}
-                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                      title="Delete user"
+                      disabled={isCurrentUser}
+                      className={`p-1.5 rounded-lg transition-all ${
+                        isCurrentUser 
+                          ? 'text-slate-600 cursor-not-allowed' 
+                          : 'text-slate-400 hover:text-red-400 hover:bg-red-500/10'
+                      }`}
+                      title={isCurrentUser ? 'Cannot delete yourself' : 'Delete user'}
                     >
                       <FiTrash2 className="text-xs" />
                     </button>
