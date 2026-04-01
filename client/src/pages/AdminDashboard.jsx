@@ -606,13 +606,13 @@ function AdminDashboard() {
     <AppLayout>
       <div className="space-y-4">
       {/* Compact Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-lg font-semibold text-white">Admin Dashboard</h1>
             {isSuperAdmin && (
-              <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 rounded text-[10px] font-medium text-purple-400">
-                Super Admin
+              <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 rounded text-[10px] font-medium text-purple-400 whitespace-nowrap">
+                👑 Super Admin
               </span>
             )}
           </div>
@@ -674,17 +674,19 @@ function AdminDashboard() {
         {/* Quick Actions */}
         <div className="bg-slate-800/50 rounded-xl border border-white/5 p-4">
           <h3 className="text-base font-semibold text-white mb-3">Quick Actions</h3>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {isSuperAdmin && (
               <button
                 onClick={() => setShowUserModal(true)}
-                className="p-3 bg-slate-700/30 hover:bg-indigo-500/10 border border-white/5 hover:border-indigo-500/30 rounded-lg transition-all group text-left"
+                className="p-3 bg-slate-700/30 hover:bg-indigo-500/10 border border-white/5 hover:border-indigo-500/30 rounded-lg transition-all group text-left relative overflow-hidden"
               >
+                <div className="absolute top-1 right-1 w-2 h-2 bg-purple-500 rounded-full"></div>
                 <div className="flex items-center gap-2 mb-1">
                   <FiUsers className="text-indigo-400 group-hover:scale-110 transition-transform" />
                   <span className="text-white text-sm font-medium">Users</span>
                 </div>
                 <p className="text-xs text-slate-500">Manage users</p>
+                <p className="text-[9px] text-purple-400 mt-1">• Super Admin Only</p>
               </button>
             )}
             <button
