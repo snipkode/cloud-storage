@@ -40,17 +40,17 @@ function StatCard({ icon: Icon, label, value, change, color, loading }) {
   );
 }
 
-// User Management Modal
+// User Management Modal - Full Screen & Compact
 function UserManagementModal({ isOpen, onClose }) {
   const { users, totalUsers, fetchUsers, updateUserRole, deleteUser } = useAdminStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showRoleDropdown, setShowRoleDropdown] = useState(null);
 
   useEffect(() => {
-    if (isOpen) fetchUsers(50, 0);
+    if (isOpen) fetchUsers(100, 0);
   }, [isOpen, fetchUsers]);
 
-  const filteredUsers = users.filter(user => 
+  const filteredUsers = users.filter(user =>
     user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -63,60 +63,60 @@ function UserManagementModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
-        {/* Header */}
-        <div className="p-4 border-b border-white/5 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <FiUsers className="text-white text-lg" />
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 z-50">
+      <div className="bg-slate-900 border border-white/10 rounded-none sm:rounded-2xl w-full h-full sm:max-h-[90vh] sm:w-[95vw] max-w-[1400px] flex flex-col shadow-2xl">
+        {/* Header - Compact */}
+        <div className="p-3 sm:p-4 border-b border-white/5 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg sm:rounded-xl flex items-center justify-center">
+              <FiUsers className="text-white text-base sm:text-lg" />
             </div>
             <div>
-              <h3 className="text-white font-semibold text-base">User Management</h3>
+              <h3 className="text-white font-semibold text-sm sm:text-base">User Management</h3>
               <p className="text-xs text-slate-500">{totalUsers || 0} total users</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-all">
-            <FiX className="text-xl" />
+          <button onClick={onClose} className="text-slate-400 hover:text-white p-1.5 sm:p-2 rounded-lg hover:bg-white/5 transition-all">
+            <FiX className="text-lg sm:text-xl" />
           </button>
         </div>
 
-        {/* Search */}
-        <div className="p-4 border-b border-white/5 flex-shrink-0">
+        {/* Search - Compact */}
+        <div className="p-2 sm:p-3 border-b border-white/5 flex-shrink-0">
           <div className="relative">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
+            <FiSearch className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs sm:text-sm" />
             <input
               type="text"
-              placeholder="Search users..."
+              placeholder="Search by name or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-800/50 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-all"
+              className="w-full bg-slate-800/50 border border-white/10 rounded-md sm:rounded-lg pl-8 sm:pl-9 pr-3 sm:pr-4 py-1.5 sm:py-2 text-white text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-all"
             />
           </div>
         </div>
 
-        {/* Users List */}
-        <div className="flex-1 overflow-auto p-2 min-h-0">
-          <div className="space-y-1">
+        {/* Users List - Compact & Dense */}
+        <div className="flex-1 overflow-auto p-1 sm:p-2 min-h-0">
+          <div className="space-y-0.5">
             {filteredUsers.map((user) => (
               <div
                 key={user.uid}
-                className="flex items-center justify-between p-3 bg-slate-800/30 rounded-lg border border-white/5 hover:border-white/10 transition-all"
+                className="flex items-center justify-between p-1.5 sm:p-2 bg-slate-800/30 rounded-md sm:rounded-lg border border-white/5 hover:border-white/10 transition-all"
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                  <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-md sm:rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
                     {user.photoURL ? (
-                      <img src={user.photoURL} alt={user.displayName} className="w-full h-full rounded-lg" />
+                      <img src={user.photoURL} alt={user.displayName} className="w-full h-full rounded-md sm:rounded-lg" />
                     ) : (
-                      <span className="text-white text-sm font-medium">
+                      <span className="text-white text-xs sm:text-sm font-medium">
                         {user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}
                       </span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-medium text-sm truncate">{user.displayName || 'Unnamed'}</span>
-                      <span className={`px-1.5 py-0.5 text-[9px] rounded font-medium border ${
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-white font-medium text-xs sm:text-sm truncate">{user.displayName || 'Unnamed'}</span>
+                      <span className={`px-1 py-0.5 text-[8px] sm:text-[9px] rounded font-medium border whitespace-nowrap ${
                         user.role === 'super_admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' :
                         user.role === 'admin' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
                         'bg-slate-500/10 text-slate-400 border-slate-500/30'
@@ -124,20 +124,20 @@ function UserManagementModal({ isOpen, onClose }) {
                         {user.role || 'user'}
                       </span>
                     </div>
-                    <span className="text-xs text-slate-500 truncate block">{user.email}</span>
+                    <span className="text-[10px] sm:text-xs text-slate-500 truncate block">{user.email}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {/* Role Dropdown */}
+                <div className="flex items-center gap-1 sm:gap-2">
+                  {/* Role Dropdown - Compact */}
                   <div className="relative">
                     <button
                       onClick={() => setShowRoleDropdown(showRoleDropdown === user.uid ? null : user.uid)}
-                      className="flex items-center gap-1 px-2 py-1.5 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-slate-300 transition-all"
+                      className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 bg-slate-700/50 hover:bg-slate-600/50 rounded text-[10px] sm:text-xs text-slate-300 transition-all"
                     >
-                      <FiEdit2 className="text-xs" />
-                      <span>Role</span>
-                      <FiChevronDown className={`text-xs transition-transform ${showRoleDropdown === user.uid ? 'rotate-180' : ''}`} />
+                      <FiEdit2 className="text-[8px] sm:text-xs" />
+                      <span className="hidden xs:inline">Role</span>
+                      <FiChevronDown className={`text-[8px] sm:text-xs transition-transform ${showRoleDropdown === user.uid ? 'rotate-180' : ''}`} />
                     </button>
                     {showRoleDropdown === user.uid && (
                       <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl z-10 min-w-[120px]">
