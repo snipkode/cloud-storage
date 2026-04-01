@@ -195,17 +195,24 @@ function FileBrowser() {
     return `${API_BASE}/api/stream/${encodeURIComponent(cleanFilename)}?token=${encodeURIComponent(token)}`;
   }, [token]);
 
-  // Load thumbnails for images
+  // Load thumbnails for images (lazy - only first 50 images, with concurrency)
   useEffect(() => {
     const loadThumbnails = async () => {
-      const imageFiles = files.filter(f => f.mimetype?.includes('image'));
+      const imageFiles = files.filter(f => f.mimetype?.includes('image')).slice(0, 50); // Limit to 50
       const urls = {};
-
-      for (const file of imageFiles) {
-        const url = await getPreviewUrl(file);
-        if (url) {
-          urls[file.id || file.filename] = url;
-        }
+      
+      // Load with concurrency limit (5 at a time)
+      const CONCURRENCY_LIMIT = 5;
+      
+      for (let i = 0; i < imageFiles.length; i += CONCURRENCY_LIMIT) {
+        const batch = imageFiles.slice(i, i + CONCURRENCY_LIMIT);
+        const promises = batch.map(async (file) => {
+          const url = await getPreviewUrl(file);
+          if (url) {
+            urls[file.id || file.filename] = url;
+          }
+        });
+        await Promise.all(promises);
       }
 
       setThumbnailUrls(urls);
@@ -223,10 +230,10 @@ function FileBrowser() {
     };
   }, [files]);
 
-  // Generate thumbnails for videos
+  // Generate thumbnails for videos (lazy - only first 20 files)
   useEffect(() => {
     const generateVideoThumbnails = async () => {
-      const videoFiles = files.filter(f => f.mimetype?.includes('video'));
+      const videoFiles = files.filter(f => f.mimetype?.includes('video')).slice(0, 20); // Limit to 20
       console.log('[VideoThumbnail] Found video files:', videoFiles.length);
       const thumbnails = {};
 
@@ -441,6 +448,15 @@ function FileBrowser() {
       fileList: filteredFiles.filter(f => f.type !== 'folder')
     };
   }, [filteredFiles]);
+
+  // Pagination for large file lists (performance optimization)
+  const [visibleFileLimit, setVisibleFileLimit] = useState(100);
+  
+  // Show all folders, but limit files for performance
+  const displayedFolders = folderItems; // Always show all folders
+  const displayedFiles = fileList.slice(0, visibleFileLimit); // Limit files
+  const hasMoreFiles = fileList.length > visibleFileLimit;
+  const remainingFiles = fileList.length - visibleFileLimit;
 
   // Calculate selected size (memoized)
   const selectedSize = useMemo(() => {
@@ -1112,7 +1128,7 @@ function FileBrowser() {
           /* Grid View */
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2 mt-3 mb-20">
           {/* Folders */}
-          {folderItems.map((folder) => (
+          {displayedFolders.map((folder) => (
             <div
               key={folder.id || folder.filename}
               onDoubleClick={() => handleDoubleClick(folder)}
@@ -1165,7 +1181,7 @@ function FileBrowser() {
           ))}
 
           {/* Files */}
-          {fileList.map((file) => {
+          {displayedFiles.map((file) => {
             const fileIcon = getFileIcon(file.mimetype, file.filename);
             const IconComponent = fileIcon.icon;
             const previewable = isPreviewable(file);
@@ -1192,7 +1208,7 @@ function FileBrowser() {
                           src={thumbnailUrls[file.id || file.filename]}
                           alt={file.originalname || file.filename}
                           className="w-full h-full object-cover rounded-lg group-hover:scale-110 transition-transform duration-300"
-                          loading="lazy"
+                          loading="eager" // Changed to eager for already loaded thumbnails
                         />
                         {/* Preview indicator */}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -1200,8 +1216,9 @@ function FileBrowser() {
                         </div>
                       </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                      // Placeholder - no thumbnail yet
+                      <div className="w-full h-full flex items-center justify-center bg-slate-800/30 rounded-lg">
+                        <FiImage className="text-slate-600 text-2xl" />
                       </div>
                     )}
                   </div>
@@ -1652,6 +1669,19 @@ function FileBrowser() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Load More Button (for large file lists) */}
+      {hasMoreFiles && viewMode === 'grid' && (
+        <div className="flex justify-center mt-6 mb-8">
+          <button
+            onClick={() => setVisibleFileLimit(prev => prev + 100)}
+            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 border border-white/10 rounded-xl text-white text-sm font-medium transition-all flex items-center gap-2"
+          >
+            <FiCloud className="text-indigo-400" />
+            Load {Math.min(100, remainingFiles)} more files ({remainingFiles} remaining)
+          </button>
         </div>
       )}
 
