@@ -43,6 +43,7 @@ function StatCard({ icon: Icon, label, value, change, color, loading }) {
 // User Management Modal - Full Screen & Compact
 function UserManagementModal({ isOpen, onClose }) {
   const { users, totalUsers, fetchUsers, updateUserRole, deleteUser } = useAdminStore();
+  const { user: currentUser } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showRoleDropdown, setShowRoleDropdown] = useState(null);
 
@@ -56,6 +57,11 @@ function UserManagementModal({ isOpen, onClose }) {
   );
 
   const handleRoleChange = async (uid, newRole) => {
+    // Prevent user from changing their own role
+    if (uid === currentUser?.uid) {
+      alert('You cannot change your own role. Please ask another super admin to change your role.');
+      return;
+    }
     await updateUserRole(uid, newRole);
     setShowRoleDropdown(null);
   };
@@ -98,79 +104,103 @@ function UserManagementModal({ isOpen, onClose }) {
         {/* Users List - Compact & Dense */}
         <div className="flex-1 overflow-auto p-1 sm:p-2 min-h-0">
           <div className="space-y-0.5">
-            {filteredUsers.map((user) => (
-              <div
-                key={user.uid}
-                className="flex items-center justify-between p-1.5 sm:p-2 bg-slate-800/30 rounded-md sm:rounded-lg border border-white/5 hover:border-white/10 transition-all"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                  <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-md sm:rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt={user.displayName} className="w-full h-full rounded-md sm:rounded-lg" />
-                    ) : (
-                      <span className="text-white text-xs sm:text-sm font-medium">
-                        {user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-white font-medium text-xs sm:text-sm truncate">{user.displayName || 'Unnamed'}</span>
-                      <span className={`px-1 py-0.5 text-[8px] sm:text-[9px] rounded font-medium border whitespace-nowrap ${
-                        user.role === 'super_admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' :
-                        user.role === 'admin' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
-                        'bg-slate-500/10 text-slate-400 border-slate-500/30'
-                      }`}>
-                        {user.role || 'user'}
-                      </span>
+            {filteredUsers.map((user) => {
+              const isCurrentUser = user.uid === currentUser?.uid;
+              
+              return (
+                <div
+                  key={user.uid}
+                  className={`flex items-center justify-between p-1.5 sm:p-2 rounded-md sm:rounded-lg border transition-all ${
+                    isCurrentUser 
+                      ? 'bg-indigo-500/10 border-indigo-500/30' 
+                      : 'bg-slate-800/30 border-white/5 hover:border-white/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-md sm:rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                      {user.photoURL ? (
+                        <img src={user.photoURL} alt={user.displayName} className="w-full h-full rounded-md sm:rounded-lg" />
+                      ) : (
+                        <span className="text-white text-xs sm:text-sm font-medium">
+                          {user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[10px] sm:text-xs text-slate-500 truncate block">{user.email}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 sm:gap-2">
-                  {/* Role Dropdown - Compact */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowRoleDropdown(showRoleDropdown === user.uid ? null : user.uid)}
-                      className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 bg-slate-700/50 hover:bg-slate-600/50 rounded text-[10px] sm:text-xs text-slate-300 transition-all"
-                    >
-                      <FiEdit2 className="text-[8px] sm:text-xs" />
-                      <span className="hidden xs:inline">Role</span>
-                      <FiChevronDown className={`text-[8px] sm:text-xs transition-transform ${showRoleDropdown === user.uid ? 'rotate-180' : ''}`} />
-                    </button>
-                    {showRoleDropdown === user.uid && (
-                      <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl z-10 min-w-[120px]">
-                        {['user', 'admin', 'super_admin'].map((role) => (
-                          <button
-                            key={role}
-                            onClick={() => handleRoleChange(user.uid, role)}
-                            className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700/50 transition-all first:rounded-t-lg last:rounded-b-lg ${
-                              user.role === role ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-300'
-                            }`}
-                          >
-                            {role}
-                          </button>
-                        ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-white font-medium text-xs sm:text-sm truncate">{user.displayName || 'Unnamed'}</span>
+                        {isCurrentUser && (
+                          <span className="px-1 py-0.5 text-[8px] sm:text-[9px] rounded font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 whitespace-nowrap">
+                            You
+                          </span>
+                        )}
+                        <span className={`px-1 py-0.5 text-[8px] sm:text-[9px] rounded font-medium border whitespace-nowrap ${
+                          user.role === 'super_admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' :
+                          user.role === 'admin' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
+                          'bg-slate-500/10 text-slate-400 border-slate-500/30'
+                        }`}>
+                          {user.role || 'user'}
+                        </span>
                       </div>
-                    )}
+                      <span className="text-[10px] sm:text-xs text-slate-500 truncate block">{user.email}</span>
+                    </div>
                   </div>
 
-                  {/* Delete Button */}
-                  <button
-                    onClick={() => {
-                      if (confirm('Delete this user? This will remove all their files and API keys.')) {
-                        deleteUser(user.uid);
-                      }
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                    title="Delete user"
-                  >
-                    <FiTrash2 className="text-xs" />
-                  </button>
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    {/* Role Dropdown - Compact */}
+                    <div className="relative">
+                      <button
+                        onClick={() => {
+                          if (isCurrentUser) {
+                            alert('You cannot change your own role. Please ask another super admin to change your role.');
+                            return;
+                          }
+                          setShowRoleDropdown(showRoleDropdown === user.uid ? null : user.uid);
+                        }}
+                        disabled={isCurrentUser}
+                        className={`flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 rounded text-[10px] sm:text-xs transition-all ${
+                          isCurrentUser 
+                            ? 'bg-slate-700/30 text-slate-500 cursor-not-allowed' 
+                            : 'bg-slate-700/50 hover:bg-slate-600/50 text-slate-300'
+                        }`}
+                      >
+                        <FiEdit2 className="text-[8px] sm:text-xs" />
+                        <span className="hidden xs:inline">{isCurrentUser ? 'Your Role' : 'Role'}</span>
+                        <FiChevronDown className={`text-[8px] sm:text-xs transition-transform ${showRoleDropdown === user.uid ? 'rotate-180' : ''}`} />
+                      </button>
+                      {showRoleDropdown === user.uid && (
+                        <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl z-10 min-w-[120px]">
+                          {['user', 'admin', 'super_admin'].map((role) => (
+                            <button
+                              key={role}
+                              onClick={() => handleRoleChange(user.uid, role)}
+                              className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700/50 transition-all first:rounded-t-lg last:rounded-b-lg ${
+                                user.role === role ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-300'
+                              }`}
+                            >
+                              {role}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={() => {
+                        if (confirm('Delete this user? This will remove all their files and API keys.')) {
+                          deleteUser(user.uid);
+                        }
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                      title="Delete user"
+                    >
+                      <FiTrash2 className="text-xs" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
